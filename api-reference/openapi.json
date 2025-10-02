@@ -33,7 +33,7 @@
     "/v1/evidence": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "Generate evidence from repository",
+        "summary": "POST /v1/evidence",
         "description": "Generate compliance evidence from a repository in specified format",
         "parameters": [
           {
@@ -134,7 +134,7 @@
     "/v1/diagram": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "Generate architecture diagram from statefile",
+        "summary": "POST /v1/diagram",
         "description": "Generate deterministic architecture diagram from Terraform statefile",
         "parameters": [
           {
