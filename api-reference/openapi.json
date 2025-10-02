@@ -1,16 +1,27 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "OpenAPI Plant Store",
-    "description": "A sample API that uses a plant store as an example to demonstrate features in the OpenAPI specification",
-    "license": {
-      "name": "MIT"
-    },
-    "version": "1.0.0"
+    "title": "Nabla Evidence Engine API",
+    "version": "0.2.0",
+    "description": "GRC evidence orchestration and delivery API. Manage evidence source connections, package evidence, and deliver to compliance and security platforms.",
+    "contact": {
+      "name": "Nabla",
+      "url": "https://www.usenabla.com"
+    }
   },
   "servers": [
     {
-      "url": "http://sandbox.mintlify.com"
+      "url": "https://api.usenabla.com/v1",
+      "description": "Primary"
+    },
+    {
+      "url": "https://api.gov.usenabla.com/v1",
+      "description": "GovCloud"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Evidence"
     }
   ],
   "security": [
@@ -19,198 +30,272 @@
     }
   ],
   "paths": {
-    "/plants": {
-      "get": {
-        "description": "Returns all plants from the system that the user has access to",
+    "/v1/evidence": {
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Generate evidence from repository",
+        "description": "Generate compliance evidence from a repository in specified format",
         "parameters": [
           {
-            "name": "limit",
-            "in": "query",
-            "description": "The maximum number of results to return",
+            "in": "header",
+            "name": "X-Customer-Key",
+            "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
+              "type": "string"
+            },
+            "description": "Customer API key for authentication"
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Plant"
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "format", "source_type", "source_path", "destination"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name for the evidence generation request"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": ["oscal", "yaml", "json"],
+                    "description": "Output format for the evidence"
+                  },
+                  "source_type": {
+                    "type": "string",
+                    "enum": ["terraform_state"],
+                    "description": "Type of evidence source to parse"
+                  },
+                  "source_path": {
+                    "type": "string",
+                    "description": "Path to evidence source (local file path or remote URL)"
+                  },
+                  "source_credentials": {
+                    "type": "string",
+                    "description": "JSON object containing source-specific credentials for authentication"
+                  },
+                  "repo": {
+                    "type": "string",
+                    "description": "Optional repository URL or identifier for Terraform configurations without remote state"
+                  },
+                  "destination": {
+                    "type": "string",
+                    "enum": ["paramify", "local"],
+                    "description": "Predefined destination for evidence delivery"
+                  },
+                  "destination_credentials": {
+                    "type": "string",
+                    "description": "JSON object containing destination-specific credentials (not required for 'local' destination)"
                   }
                 }
               }
             }
-          },
-          "400": {
-            "description": "Unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
           }
-        }
-      },
-      "post": {
-        "description": "Creates a new plant in the store",
-        "requestBody": {
-          "description": "Plant to add to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          },
-          "required": true
         },
         "responses": {
           "200": {
-            "description": "plant response",
+            "description": "Evidence generation completed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Plant"
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["queued", "running", "completed", "failed"]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["id", "status", "created_at"]
                 }
               }
             }
           },
           "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
           }
         }
       }
     },
-    "/plants/{id}": {
-      "delete": {
-        "description": "Deletes a single plant based on the ID supplied",
+    "/v1/diagram": {
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Generate architecture diagram from statefile",
+        "description": "Generate deterministic architecture diagram from Terraform statefile",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "ID of plant to delete",
+            "in": "header",
+            "name": "X-Customer-Key",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
+              "type": "string"
+            },
+            "description": "Customer API key for authentication"
           }
         ],
-        "responses": {
-          "204": {
-            "description": "Plant deleted",
-            "content": {}
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  "webhooks": {
-    "/plant/webhook": {
-      "post": {
-        "description": "Information about a new plant added to the store",
         "requestBody": {
-          "description": "Plant added to the store",
+          "required": true,
           "content": {
-            "application/json": {
+            "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/NewPlant"
+                "type": "object",
+                "required": ["name", "statefile_path"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name for the diagram generation request"
+                  },
+                  "statefile_path": {
+                    "type": "string",
+                    "description": "Path to Terraform statefile (local file path or remote URL)"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Return a 200 status to indicate that the data was received successfully"
+            "description": "Diagram generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "svg_content": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "graph_json": {
+                      "type": "string"
+                    },
+                    "scene_json": {
+                      "type": "string"
+                    },
+                    "sha256_hashes": {
+                      "type": "object",
+                      "properties": {
+                        "graph_sha256": {
+                          "type": "string"
+                        },
+                        "scene_sha256": {
+                          "type": "string"
+                        },
+                        "svg_sha256": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["graph_sha256", "scene_sha256", "svg_sha256"]
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "generated_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "rules_version": {
+                          "type": "string"
+                        },
+                        "node_count": {
+                          "type": "integer"
+                        },
+                        "edge_count": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": ["generated_at", "source", "rules_version", "node_count", "edge_count"]
+                    }
+                  },
+                  "required": ["svg_content", "description", "graph_json", "scene_json", "sha256_hashes", "metadata"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
           }
         }
       }
     }
   },
   "components": {
-    "schemas": {
-      "Plant": {
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "The name of the plant",
-            "type": "string"
-          },
-          "tag": {
-            "description": "Tag to specify the type",
-            "type": "string"
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
           }
         }
       },
-      "NewPlant": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Plant"
-          },
-          {
-            "required": [
-              "id"
-            ],
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "Identification number of the plant",
-                "type": "integer",
-                "format": "int64"
-              }
+      "Unauthorized": {
+        "description": "Not authenticated",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
             }
           }
-        ]
+        }
       },
-      "Error": {
-        "required": [
-          "error",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
+      "Unprocessable": {
+        "description": "Unprocessable entity",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
           }
         }
       }
     },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": ["error", "message"]
       }
     }
   }
