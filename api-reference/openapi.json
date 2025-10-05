@@ -11,7 +11,7 @@
   },
   "servers": [
     {
-      "url": "https://api.usenabla.com/v1",
+      "url": "https://api.usenabla.com",
       "description": "Primary"
     }
   ],
