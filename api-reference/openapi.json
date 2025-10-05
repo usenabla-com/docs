@@ -213,7 +213,7 @@
     "/v1/cmmc": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "Generate CMMC evidence from repository",
+        "summary": "Assesss CMMC",
         "description": "Generate CMMC 2.0 compliance evidence (NIST 800-171 + 800-172) from a repository in specified format",
         "parameters": [
           {
@@ -401,7 +401,7 @@
     "/v1/diagram": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "Generate architecture diagram from statefile",
+        "summary": "Generate architecture diagram",
         "description": "Generate Mermaid architecture diagram from Terraform statefile using AI",
         "parameters": [
           {
@@ -498,7 +498,7 @@
     "/v1/fips": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "Generate FIPS cryptographic assessment from evidence ZIP",
+        "summary": "Assesss FIPS",
         "description": "Upload a ZIP archive containing multiple evidence sources and generate FIPS 140-2/140-3 cryptographic compliance assessment",
         "parameters": [
           {
