@@ -417,19 +417,23 @@
         "requestBody": {
           "required": true,
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["metadata"],
+                "required": ["name", "format", "zip_content"],
                 "properties": {
-                  "metadata": {
+                  "name": {
                     "type": "string",
-                    "description": "JSON metadata string containing name, format, and optionally zip_content (base64) fields. Example with file upload: {\"name\":\"fips-assessment\",\"format\":\"oscal\"}. Example with base64 content: {\"name\":\"fips-assessment\",\"format\":\"oscal\",\"zip_content\":\"UEsDBBQ...\"}"
+                    "description": "Name for the FIPS assessment request"
                   },
-                  "evidence": {
+                  "format": {
                     "type": "string",
-                    "format": "binary",
-                    "description": "ZIP archive containing evidence files (SBOM, Terraform, Kubernetes, etc.). Either this file upload or zip_content in metadata is required."
+                    "enum": ["oscal", "yaml", "json"],
+                    "description": "Output format for the evidence"
+                  },
+                  "zip_content": {
+                    "type": "string",
+                    "description": "Base64-encoded ZIP archive containing evidence files. Supported evidence types: SBOM (sbom, cyclonedx, spdx), Terraform state files (terraform, tfstate), Kubernetes manifests (kubernetes, k8s), Ansible playbooks (ansible), package lock files (package_lock, npm, poetry, cargo, go_mod), system info (system_info, openssl, crypto_policy)"
                   }
                 }
               }
