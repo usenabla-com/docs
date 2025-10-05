@@ -24,16 +24,12 @@
       "name": "Evidence"
     }
   ],
-  "security": [
-    {
-      "bearerAuth": []
-    }
-  ],
+  "security": [],
   "paths": {
     "/v1/evidence": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "POST /v1/evidence",
+        "summary": "Generate evidence from repository",
         "description": "Generate compliance evidence from a repository in specified format",
         "parameters": [
           {
@@ -52,7 +48,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name", "format", "source_type", "source_path", "destination"],
+                "required": ["name", "format", "source_type"],
                 "properties": {
                   "name": {
                     "type": "string",
@@ -70,7 +66,11 @@
                   },
                   "source_path": {
                     "type": "string",
-                    "description": "Path to evidence source (local file path or remote URL)"
+                    "description": "Path to evidence source (local file path or remote URL). Either source_path or source_content is required."
+                  },
+                  "source_content": {
+                    "type": "string",
+                    "description": "Base64-encoded evidence source content. Either source_path or source_content is required."
                   },
                   "source_credentials": {
                     "type": "string",
@@ -79,15 +79,6 @@
                   "repo": {
                     "type": "string",
                     "description": "Optional repository URL or identifier for Terraform configurations without remote state"
-                  },
-                  "destination": {
-                    "type": "string",
-                    "enum": ["paramify", "local"],
-                    "description": "Predefined destination for evidence delivery"
-                  },
-                  "destination_credentials": {
-                    "type": "string",
-                    "description": "JSON object containing destination-specific credentials (not required for 'local' destination)"
                   }
                 }
               }
@@ -112,9 +103,477 @@
                     "created_at": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "assessment": {
+                      "type": "object",
+                      "description": "Compliance assessment results",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "framework": {
+                          "type": "string",
+                          "description": "Compliance framework name (e.g., NIST 800-53, CMMC, FIPS)"
+                        },
+                        "version": {
+                          "type": "string",
+                          "description": "Framework version"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "controls": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "control_id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["satisfied", "not-satisfied", "not-applicable"]
+                              },
+                              "findings": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "evidence": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["control_id", "title", "status", "findings", "evidence"]
+                          }
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "total_controls": {
+                              "type": "integer"
+                            },
+                            "satisfied": {
+                              "type": "integer"
+                            },
+                            "not_satisfied": {
+                              "type": "integer"
+                            },
+                            "not_applicable": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"]
+                        }
+                      },
+                      "required": ["id", "framework", "version", "timestamp", "controls", "summary"]
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "filename": {
+                            "type": "string"
+                          },
+                          "content_type": {
+                            "type": "string"
+                          },
+                          "content_base64": {
+                            "type": "string"
+                          },
+                          "size_bytes": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": ["filename", "content_type", "content_base64", "size_bytes"]
+                      }
                     }
                   },
-                  "required": ["id", "status", "created_at"]
+                  "required": ["id", "status", "created_at", "assessment", "artifacts"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/fedramp": {
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Generate FedRAMP evidence from repository",
+        "description": "Generate FedRAMP compliance evidence (NIST 800-53) from a repository in specified format",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Customer-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer API key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "format", "source_type"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name for the evidence generation request"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": ["oscal", "yaml", "json"],
+                    "description": "Output format for the evidence"
+                  },
+                  "source_type": {
+                    "type": "string",
+                    "enum": ["terraform_state"],
+                    "description": "Type of evidence source to parse"
+                  },
+                  "source_path": {
+                    "type": "string",
+                    "description": "Path to evidence source (local file path or remote URL). Either source_path or source_content is required."
+                  },
+                  "source_content": {
+                    "type": "string",
+                    "description": "Base64-encoded evidence source content. Either source_path or source_content is required."
+                  },
+                  "source_credentials": {
+                    "type": "string",
+                    "description": "JSON object containing source-specific credentials for authentication"
+                  },
+                  "repo": {
+                    "type": "string",
+                    "description": "Optional repository URL or identifier for Terraform configurations without remote state"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "FedRAMP evidence generation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["queued", "running", "completed", "failed"]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "assessment": {
+                      "type": "object",
+                      "description": "Compliance assessment results",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "framework": {
+                          "type": "string",
+                          "description": "Compliance framework name (e.g., NIST 800-53, CMMC, FIPS)"
+                        },
+                        "version": {
+                          "type": "string",
+                          "description": "Framework version"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "controls": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "control_id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["satisfied", "not-satisfied", "not-applicable"]
+                              },
+                              "findings": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "evidence": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["control_id", "title", "status", "findings", "evidence"]
+                          }
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "total_controls": {
+                              "type": "integer"
+                            },
+                            "satisfied": {
+                              "type": "integer"
+                            },
+                            "not_satisfied": {
+                              "type": "integer"
+                            },
+                            "not_applicable": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"]
+                        }
+                      },
+                      "required": ["id", "framework", "version", "timestamp", "controls", "summary"]
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "filename": {
+                            "type": "string"
+                          },
+                          "content_type": {
+                            "type": "string"
+                          },
+                          "content_base64": {
+                            "type": "string"
+                          },
+                          "size_bytes": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": ["filename", "content_type", "content_base64", "size_bytes"]
+                      }
+                    }
+                  },
+                  "required": ["id", "status", "created_at", "assessment", "artifacts"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/cmmc": {
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Generate CMMC evidence from repository",
+        "description": "Generate CMMC 2.0 compliance evidence (NIST 800-171 + 800-172) from a repository in specified format",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Customer-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer API key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "format", "source_type"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name for the evidence generation request"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": ["oscal", "yaml", "json"],
+                    "description": "Output format for the evidence"
+                  },
+                  "source_type": {
+                    "type": "string",
+                    "enum": ["terraform_state"],
+                    "description": "Type of evidence source to parse"
+                  },
+                  "source_path": {
+                    "type": "string",
+                    "description": "Path to evidence source (local file path or remote URL). Either source_path or source_content is required."
+                  },
+                  "source_content": {
+                    "type": "string",
+                    "description": "Base64-encoded evidence source content. Either source_path or source_content is required."
+                  },
+                  "source_credentials": {
+                    "type": "string",
+                    "description": "JSON object containing source-specific credentials for authentication"
+                  },
+                  "repo": {
+                    "type": "string",
+                    "description": "Optional repository URL or identifier for Terraform configurations without remote state"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CMMC evidence generation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["queued", "running", "completed", "failed"]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "assessment": {
+                      "type": "object",
+                      "description": "Compliance assessment results",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "framework": {
+                          "type": "string",
+                          "description": "Compliance framework name (e.g., NIST 800-53, CMMC, FIPS)"
+                        },
+                        "version": {
+                          "type": "string",
+                          "description": "Framework version"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "controls": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "control_id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["satisfied", "not-satisfied", "not-applicable"]
+                              },
+                              "findings": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "evidence": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["control_id", "title", "status", "findings", "evidence"]
+                          }
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "total_controls": {
+                              "type": "integer"
+                            },
+                            "satisfied": {
+                              "type": "integer"
+                            },
+                            "not_satisfied": {
+                              "type": "integer"
+                            },
+                            "not_applicable": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"]
+                        }
+                      },
+                      "required": ["id", "framework", "version", "timestamp", "controls", "summary"]
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "filename": {
+                            "type": "string"
+                          },
+                          "content_type": {
+                            "type": "string"
+                          },
+                          "content_base64": {
+                            "type": "string"
+                          },
+                          "size_bytes": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": ["filename", "content_type", "content_base64", "size_bytes"]
+                      }
+                    }
+                  },
+                  "required": ["id", "status", "created_at", "assessment", "artifacts"]
                 }
               }
             }
@@ -134,8 +593,8 @@
     "/v1/diagram": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "POST /v1/diagram",
-        "description": "Generate deterministic architecture diagram from Terraform statefile",
+        "summary": "Generate architecture diagram from statefile",
+        "description": "Generate Mermaid architecture diagram from Terraform statefile using AI",
         "parameters": [
           {
             "in": "header",
@@ -150,10 +609,10 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/x-www-form-urlencoded": {
+            "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name", "statefile_path"],
+                "required": ["name"],
                 "properties": {
                   "name": {
                     "type": "string",
@@ -161,7 +620,19 @@
                   },
                   "statefile_path": {
                     "type": "string",
-                    "description": "Path to Terraform statefile (local file path or remote URL)"
+                    "description": "Path to Terraform statefile (local file path or remote URL). Either statefile_path or statefile_content is required."
+                  },
+                  "statefile_content": {
+                    "type": "string",
+                    "description": "Base64-encoded Terraform statefile content. Either statefile_path or statefile_content is required."
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Optional LLM model to use (e.g., \"@cf/openai/gpt-oss-120b\")"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "description": "Optional API key for AI service"
                   }
                 }
               }
@@ -176,32 +647,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "svg_content": {
+                    "mermaid_content": {
                       "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "graph_json": {
-                      "type": "string"
-                    },
-                    "scene_json": {
-                      "type": "string"
-                    },
-                    "sha256_hashes": {
-                      "type": "object",
-                      "properties": {
-                        "graph_sha256": {
-                          "type": "string"
-                        },
-                        "scene_sha256": {
-                          "type": "string"
-                        },
-                        "svg_sha256": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["graph_sha256", "scene_sha256", "svg_sha256"]
                     },
                     "metadata": {
                       "type": "object",
@@ -210,23 +657,187 @@
                           "type": "string",
                           "format": "date-time"
                         },
-                        "source": {
-                          "type": "string"
-                        },
-                        "rules_version": {
-                          "type": "string"
-                        },
                         "node_count": {
                           "type": "integer"
                         },
                         "edge_count": {
                           "type": "integer"
+                        },
+                        "title": {
+                          "type": "string"
                         }
                       },
-                      "required": ["generated_at", "source", "rules_version", "node_count", "edge_count"]
+                      "required": ["generated_at", "node_count", "edge_count", "title"]
                     }
                   },
-                  "required": ["svg_content", "description", "graph_json", "scene_json", "sha256_hashes", "metadata"]
+                  "required": ["mermaid_content", "metadata"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/fips": {
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Generate FIPS cryptographic assessment from evidence ZIP",
+        "description": "Upload a ZIP archive containing multiple evidence sources and generate FIPS 140-2/140-3 cryptographic compliance assessment",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Customer-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer API key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["metadata"],
+                "properties": {
+                  "metadata": {
+                    "type": "string",
+                    "description": "JSON metadata string containing name, format, and optionally zip_content (base64) fields. Example with file upload: {\"name\":\"fips-assessment\",\"format\":\"oscal\"}. Example with base64 content: {\"name\":\"fips-assessment\",\"format\":\"oscal\",\"zip_content\":\"UEsDBBQ...\"}"
+                  },
+                  "evidence": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "ZIP archive containing evidence files (SBOM, Terraform, Kubernetes, etc.). Either this file upload or zip_content in metadata is required."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "FIPS evidence assessment completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["queued", "running", "completed", "failed"]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "assessment": {
+                      "type": "object",
+                      "description": "Compliance assessment results",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "framework": {
+                          "type": "string",
+                          "description": "Compliance framework name (e.g., NIST 800-53, CMMC, FIPS)"
+                        },
+                        "version": {
+                          "type": "string",
+                          "description": "Framework version"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "controls": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "control_id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["satisfied", "not-satisfied", "not-applicable"]
+                              },
+                              "findings": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "evidence": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["control_id", "title", "status", "findings", "evidence"]
+                          }
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "total_controls": {
+                              "type": "integer"
+                            },
+                            "satisfied": {
+                              "type": "integer"
+                            },
+                            "not_satisfied": {
+                              "type": "integer"
+                            },
+                            "not_applicable": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"]
+                        }
+                      },
+                      "required": ["id", "framework", "version", "timestamp", "controls", "summary"]
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "filename": {
+                            "type": "string"
+                          },
+                          "content_type": {
+                            "type": "string"
+                          },
+                          "content_base64": {
+                            "type": "string"
+                          },
+                          "size_bytes": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": ["filename", "content_type", "content_base64", "size_bytes"]
+                      }
+                    }
+                  },
+                  "required": ["id", "status", "created_at", "assessment", "artifacts"]
                 }
               }
             }
