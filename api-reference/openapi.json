@@ -25,7 +25,7 @@
     "/v1/fedramp": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "POST Assesss FedRamp",
+        "summary": "Assesss FedRamp",
         "description": "Generate FedRAMP compliance evidence (NIST 800-53) from a repository in specified format",
         "parameters": [
           {
