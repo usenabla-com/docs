@@ -398,103 +398,6 @@
         }
       }
     },
-    "/v1/diagram": {
-      "post": {
-        "tags": ["Evidence"],
-        "summary": "Generate architecture diagram",
-        "description": "Generate Mermaid architecture diagram from Terraform statefile using AI",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Customer-Key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Customer API key for authentication"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["name"],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Name for the diagram generation request"
-                  },
-                  "statefile_path": {
-                    "type": "string",
-                    "description": "Path to Terraform statefile (local file path or remote URL). Either statefile_path or statefile_content is required."
-                  },
-                  "statefile_content": {
-                    "type": "string",
-                    "description": "Base64-encoded Terraform statefile content. Either statefile_path or statefile_content is required."
-                  },
-                  "model": {
-                    "type": "string",
-                    "description": "Optional LLM model to use (e.g., \"@cf/openai/gpt-oss-120b\")"
-                  },
-                  "api_key": {
-                    "type": "string",
-                    "description": "Optional API key for AI service"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Diagram generated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "mermaid_content": {
-                      "type": "string"
-                    },
-                    "metadata": {
-                      "type": "object",
-                      "properties": {
-                        "generated_at": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "node_count": {
-                          "type": "integer"
-                        },
-                        "edge_count": {
-                          "type": "integer"
-                        },
-                        "title": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["generated_at", "node_count", "edge_count", "title"]
-                    }
-                  },
-                  "required": ["mermaid_content", "metadata"]
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "422": {
-            "$ref": "#/components/responses/Unprocessable"
-          }
-        }
-      }
-    },
     "/v1/fips": {
       "post": {
         "tags": ["Evidence"],
@@ -646,6 +549,103 @@
                     }
                   },
                   "required": ["id", "status", "created_at", "assessment", "artifacts"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/diagram": {
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Generate architecture diagram",
+        "description": "Generate Mermaid architecture diagram from Terraform statefile using AI",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Customer-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer API key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name for the diagram generation request"
+                  },
+                  "statefile_path": {
+                    "type": "string",
+                    "description": "Path to Terraform statefile (local file path or remote URL). Either statefile_path or statefile_content is required."
+                  },
+                  "statefile_content": {
+                    "type": "string",
+                    "description": "Base64-encoded Terraform statefile content. Either statefile_path or statefile_content is required."
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Optional LLM model to use (e.g., \"@cf/openai/gpt-oss-120b\")"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "description": "Optional API key for AI service"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Diagram generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mermaid_content": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "generated_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "node_count": {
+                          "type": "integer"
+                        },
+                        "edge_count": {
+                          "type": "integer"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["generated_at", "node_count", "edge_count", "title"]
+                    }
+                  },
+                  "required": ["mermaid_content", "metadata"]
                 }
               }
             }
