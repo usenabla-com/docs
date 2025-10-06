@@ -1,33 +1,154 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: 'API Reference'
+description: 'Nabla Evidence Engine API - GRC evidence orchestration and compliance assessment'
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+## Overview
 
-## Welcome
+The Nabla Evidence Engine API enables programmatic compliance assessments and evidence generation for federal and defense security frameworks. Generate OSCAL-compliant assessment results from infrastructure-as-code, SBOMs, and system metadata without manual evidence collection.
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+**Base URL**: `https://api.usenabla.com`
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+## Supported Frameworks
+
+Nabla provides compliance assessments for the following security frameworks:
+
+<CardGroup cols={2}>
+  <Card title="FedRAMP" icon="shield-halved" href="/api-reference/schemas/800-53">
+    NIST 800-53 security controls for federal cloud services
+  </Card>
+  <Card title="CMMC 2.0" icon="lock" href="/api-reference/schemas/800-171">
+    Defense Industrial Base cybersecurity requirements
+  </Card>
+  <Card title="FIPS 140-3" icon="key" href="/api-reference/schemas/fips-140-3">
+    Cryptographic module validation and compliance
+  </Card>
+  <Card title="NIST 800-172" icon="shield-check" href="/api-reference/schemas/800-172">
+    Enhanced security requirements for CUI
+  </Card>
+</CardGroup>
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+All API endpoints require authentication using a customer API key passed via the `X-Customer-Key` header.
+
+```bash
+curl --request POST \
+  --url https://api.usenabla.com/v1/fedramp \
+  --header 'X-Customer-Key: your-api-key' \
+  --header 'Content-Type: application/json'
+```
+
+<Note>
+Contact [Nabla](https://cal.com/team/nabla/nabla-pilot-interest-call) to obtain your API key.
+</Note>
+
+## Output Formats
+
+All assessment endpoints support multiple output formats:
+
+| Format | Description | Use Case |
+|--------|-------------|----------|
+| **oscal** | OSCAL Assessment Results (JSON) | GRC platforms, FedRAMP submission |
+| **yaml** | Human-readable YAML | Manual review, version control |
+| **json** | Simplified JSON structure | Custom integrations, dashboards |
+
+## Evidence Sources
+
+Nabla accepts evidence from multiple sources:
+
+### Infrastructure-as-Code
+- **Terraform State**: Remote state files (S3, GCS, Azure Blob, HTTP)
+- **Repository URLs**: Direct Terraform configuration analysis
+
+### Software Supply Chain
+- **SBOM**: CycloneDX, SPDX formats
+- **Package Locks**: npm, poetry, cargo, go.mod
+
+### System Metadata
+- **System Info**: FIPS mode status, OpenSSL configuration
+- **Crypto Policies**: OS-level cryptographic policies
+
+### Configuration Management
+- **Kubernetes**: Manifests, Helm charts
+- **Ansible**: Playbooks, inventories
+
+<Warning>
+**Evidence Scope**: Assessments are based on declared infrastructure in code and metadata. Runtime configurations not reflected in evidence sources will not be assessed.
+</Warning>
+
+## Assessment Response
+
+All assessment endpoints return a standardized response structure:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+{
+  "id": "assessment-uuid",
+  "status": "completed",
+  "created_at": "2025-10-05T12:00:00Z",
+  "assessment": {
+    "framework": "NIST 800-53 Rev 5",
+    "version": "5.1.1",
+    "controls": [
+      {
+        "control_id": "SC-13",
+        "title": "Cryptographic Protection",
+        "status": "satisfied",
+        "findings": [],
+        "evidence": [
+          "FIPS-validated library: OpenSSL v3.0.8 (CMVP Certificate #4282)",
+          "Encryption at rest enabled: s3-data-lake"
+        ]
+      }
+    ],
+    "summary": {
+      "total_controls": 421,
+      "satisfied": 318,
+      "not_satisfied": 89,
+      "not_applicable": 14
+    }
+  },
+  "artifacts": [
+    {
+      "filename": "assessment-results.json",
+      "content_type": "application/json",
+      "content_base64": "eyJhc3Nlc3NtZW50...",
+      "size_bytes": 524288
+    }
+  ]
+}
 ```
+
+## Additional Capabilities
+
+### Architecture Diagrams
+
+Generate Mermaid diagrams from Terraform state using AI:
+
+```bash
+curl --request POST \
+  --url https://api.usenabla.com/v1/diagram \
+  --header 'X-Customer-Key: your-api-key' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "production-architecture",
+    "statefile_content": "<base64_statefile>"
+  }'
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Framework Schemas" icon="book" href="/api-reference/schemas/fips-140-3">
+    Explore detailed framework documentation
+  </Card>
+  <Card title="OpenAPI Spec" icon="code" href="https://github.com/nabla/api-spec">
+    Download the complete OpenAPI specification
+  </Card>
+</CardGroup>
+
+## Support
+
+- **Documentation**: [docs.usenabla.com](https://docs.usenabla.com)
+- **Contact**: [support@usenabla.com](mailto:support@usenabla.com)
+- **Website**: [usenabla.com](https://www.usenabla.com)

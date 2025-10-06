@@ -440,7 +440,7 @@ Remediation: Provide key spec, usage, rotation settings
 | Algorithm | Key Size | Status | Use Case |
 |-----------|----------|--------|----------|
 | **AES** | 128, 192, 256 bits |  Approved | Symmetric encryption |
-| **Triple-DES** | 168 bits (112 effective) | � Legacy (disallowed after 2023) | Migration only |
+| **Triple-DES** | 168 bits (112 effective) | Legacy (disallowed after 2023) | Migration only |
 | **RSA** | e2048 bits |  Approved | Asymmetric encryption |
 | **ECC** | e256 bits (P-256, P-384, P-521) |  Approved | Asymmetric encryption |
 
@@ -450,8 +450,8 @@ Remediation: Provide key spec, usage, rotation settings
 |-----------|-------------|--------|----------|
 | **SHA-2** | 224, 256, 384, 512 bits |  Approved | Digital signatures, HMAC |
 | **SHA-3** | 224, 256, 384, 512 bits |  Approved | Next-gen hashing |
-| **SHA-1** | 160 bits | L Disallowed | Legacy only (signatures prohibited) |
-| **MD5** | 128 bits | L Disallowed | Non-cryptographic use only |
+| **SHA-1** | 160 bits | Disallowed | Legacy only (signatures prohibited) |
+| **MD5** | 128 bits | Disallowed | Non-cryptographic use only |
 
 ### Key Agreement
 
@@ -496,7 +496,6 @@ Remediation: Provide key spec, usage, rotation settings
 3. **Document CMVP Certificates**: Include certificate numbers in SBOM metadata
 4. **Rotate Keys**: Enable automatic key rotation (annually minimum)
 5. **Audit Cryptographic Inventory**: Maintain up-to-date SBOM with crypto libraries
-6. **Test FIPS Endpoints**: Use FIPS-specific API endpoints (e.g., `kms-fips.us-east-1.amazonaws.com`)
 
 **Migration Note**: FIPS 140-2 validations remain acceptable until September 2026. After this date, only FIPS 140-3 validated modules will be compliant.
 
