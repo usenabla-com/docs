@@ -22,19 +22,11 @@
             ]
           },
           {
-            "group": "Customization",
+            "group": "Examples",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "examples/chatbot",
+              "examples/code-assistant",
+              "examples/knowledge-base"
             ]
           },
           {
@@ -63,14 +55,14 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "Homepage",
+          "href": "https://www.usenabla.com",
+          "icon": "home"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "Get an API Key",
+          "href": "https://cal.com/team/nabla/nabla-pilot-interest-call",
+          "icon": "key"
         }
       ]
     }
@@ -83,13 +75,13 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "href": "mailto:support@usenabla.com"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Get an API Key",
+      "href": "https://cal.com/team/nabla/nabla-pilot-interest-call"
     }
   },
   "contextual": {
