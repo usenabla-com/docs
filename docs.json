@@ -24,9 +24,10 @@
           {
             "group": "Implementation Examples",
             "pages": [
-              "examples/chatbot",
-              "examples/code-assistant",
-              "examples/knowledge-base"
+              "examples/fedramp-assessment",
+              "examples/cmmc-assessment",
+              "examples/diagram-generation",
+              "examples/fips-assessment"
             ]
           }
         ]
