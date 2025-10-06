@@ -1,0 +1,514 @@
+---
+title: 'CMMC Assessment Example'
+description: 'Generate CMMC 2.0 compliance evidence from infrastructure'
+---
+
+# CMMC 2.0 Assessment Implementation
+
+Generate CMMC (Cybersecurity Maturity Model Certification) 2.0 compliance evidence based on NIST 800-171 and 800-172 controls from your infrastructure-as-code.
+
+## Quick Start
+
+```bash
+curl -X POST https://api.usenabla.com/v1/cmmc \
+  -H "X-Customer-Key: your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CMMC Level 2 Assessment",
+    "format": "json",
+    "source_type": "terraform_state",
+    "source_path": "s3://terraform-states/cmmc/terraform.tfstate",
+    "source_credentials": "{\"aws_access_key_id\":\"AKIA...\",\"aws_secret_access_key\":\"...\"}"
+  }'
+```
+
+## CMMC Level Assessment
+
+### Level 1: Foundational
+
+```python
+import requests
+import base64
+
+def assess_cmmc_level1(statefile_path: str, api_key: str):
+    """
+    CMMC Level 1 assessment focuses on:
+    - Basic cyber hygiene
+    - Protection of Federal Contract Information (FCI)
+    - 17 practices mapped from FAR Clause 52.204-21
+    """
+    with open(statefile_path, 'rb') as f:
+        state_content = base64.b64encode(f.read()).decode('utf-8')
+
+    response = requests.post(
+        "https://api.usenabla.com/v1/cmmc",
+        headers={
+            "X-Customer-Key": api_key,
+            "Content-Type": "application/json"
+        },
+        json={
+            "name": "CMMC Level 1 - Basic Cyber Hygiene",
+            "format": "json",
+            "source_type": "terraform_state",
+            "source_content": state_content
+        }
+    )
+
+    result = response.json()
+
+    # Filter for Level 1 controls
+    level1_controls = [
+        ctrl for ctrl in result["assessment"]["controls"]
+        if ctrl["control_id"].startswith("AC.1") or
+           ctrl["control_id"].startswith("IA.1") or
+           ctrl["control_id"].startswith("MP.1")
+    ]
+
+    return {
+        "level": 1,
+        "total_controls": len(level1_controls),
+        "satisfied": len([c for c in level1_controls if c["status"] == "satisfied"]),
+        "controls": level1_controls
+    }
+```
+
+### Level 2: Advanced
+
+```python
+def assess_cmmc_level2(statefile_path: str, api_key: str):
+    """
+    CMMC Level 2 assessment includes:
+    - All Level 1 requirements
+    - Protection of Controlled Unclassified Information (CUI)
+    - 110 practices from NIST SP 800-171 Rev 2
+    """
+    with open(statefile_path, 'rb') as f:
+        state_content = base64.b64encode(f.read()).decode('utf-8')
+
+    response = requests.post(
+        "https://api.usenabla.com/v1/cmmc",
+        headers={
+            "X-Customer-Key": api_key,
+            "Content-Type": "application/json"
+        },
+        json={
+            "name": "CMMC Level 2 - CUI Protection",
+            "format": "oscal",
+            "source_type": "terraform_state",
+            "source_content": state_content
+        }
+    )
+
+    return response.json()
+```
+
+### Level 3: Expert
+
+```python
+def assess_cmmc_level3(statefile_path: str, api_key: str):
+    """
+    CMMC Level 3 assessment includes:
+    - All Level 2 requirements
+    - Protection against Advanced Persistent Threats (APTs)
+    - Additional practices from NIST SP 800-172
+    """
+    with open(statefile_path, 'rb') as f:
+        state_content = base64.b64encode(f.read()).decode('utf-8')
+
+    response = requests.post(
+        "https://api.usenabla.com/v1/cmmc",
+        headers={
+            "X-Customer-Key": api_key,
+            "Content-Type": "application/json"
+        },
+        json={
+            "name": "CMMC Level 3 - APT Protection",
+            "format": "oscal",
+            "source_type": "terraform_state",
+            "source_content": state_content
+        }
+    )
+
+    result = response.json()
+
+    # Generate compliance matrix
+    return generate_compliance_matrix(result)
+
+def generate_compliance_matrix(assessment_result):
+    """Generate a compliance matrix by domain."""
+    domains = {}
+
+    for control in assessment_result["assessment"]["controls"]:
+        # Extract domain from control_id (e.g., "AC" from "AC.2.001")
+        domain = control["control_id"].split(".")[0]
+
+        if domain not in domains:
+            domains[domain] = {
+                "name": domain,
+                "total": 0,
+                "satisfied": 0,
+                "not_satisfied": 0
+            }
+
+        domains[domain]["total"] += 1
+        if control["status"] == "satisfied":
+            domains[domain]["satisfied"] += 1
+        elif control["status"] == "not-satisfied":
+            domains[domain]["not_satisfied"] += 1
+
+    return {
+        "assessment_id": assessment_result["id"],
+        "domains": domains,
+        "overall_compliance": sum(d["satisfied"] for d in domains.values()) /
+                            sum(d["total"] for d in domains.values()) * 100
+    }
+```
+
+## Domain-Specific Checks
+
+### Access Control (AC)
+
+```python
+def check_access_control_compliance(assessment):
+    """
+    Verify CMMC Access Control requirements:
+    - AC.1.001: Limit system access to authorized users
+    - AC.1.002: Limit system access to authorized functions
+    - AC.2.001: Limit system access to types of transactions
+    """
+    ac_controls = [
+        ctrl for ctrl in assessment["assessment"]["controls"]
+        if ctrl["control_id"].startswith("AC.")
+    ]
+
+    findings = {
+        "critical": [],
+        "warnings": [],
+        "passed": []
+    }
+
+    for control in ac_controls:
+        if control["status"] == "not-satisfied":
+            findings["critical"].append({
+                "control_id": control["control_id"],
+                "title": control["title"],
+                "findings": control["findings"]
+            })
+        elif control["status"] == "satisfied":
+            findings["passed"].append(control["control_id"])
+
+    return findings
+```
+
+### Incident Response (IR)
+
+```python
+def check_incident_response_compliance(assessment):
+    """
+    Verify CMMC Incident Response requirements:
+    - IR.2.001: Establish operational incident-handling capability
+    - IR.2.002: Track, document, and report incidents
+    - IR.3.001: Test incident response capability
+    """
+    ir_controls = [
+        ctrl for ctrl in assessment["assessment"]["controls"]
+        if ctrl["control_id"].startswith("IR.")
+    ]
+
+    return {
+        "automated_detection": any(
+            "cloudwatch" in str(ctrl.get("evidence", [])).lower() or
+            "guardduty" in str(ctrl.get("evidence", [])).lower()
+            for ctrl in ir_controls
+        ),
+        "logging_enabled": any(
+            "cloudtrail" in str(ctrl.get("evidence", [])).lower()
+            for ctrl in ir_controls
+        ),
+        "controls": ir_controls
+    }
+```
+
+## Multi-Environment Assessment
+
+```python
+class CMMCMultiEnvAssessor:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://api.usenabla.com"
+
+    def assess_environments(self, environments: dict):
+        """Assess multiple environments and compare compliance."""
+        results = {}
+
+        for env_name, state_path in environments.items():
+            print(f"Assessing {env_name}...")
+
+            with open(state_path, 'rb') as f:
+                state_content = base64.b64encode(f.read()).decode('utf-8')
+
+            response = requests.post(
+                f"{self.base_url}/v1/cmmc",
+                headers={
+                    "X-Customer-Key": self.api_key,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "name": f"CMMC Assessment - {env_name}",
+                    "format": "json",
+                    "source_type": "terraform_state",
+                    "source_content": state_content
+                }
+            )
+
+            results[env_name] = response.json()
+
+        return self.generate_comparison_report(results)
+
+    def generate_comparison_report(self, results: dict):
+        """Generate a comparison report across environments."""
+        report = {
+            "environments": {},
+            "common_issues": [],
+            "recommendations": []
+        }
+
+        for env_name, result in results.items():
+            summary = result["assessment"]["summary"]
+            report["environments"][env_name] = {
+                "compliance_rate": (summary["satisfied"] / summary["total_controls"]) * 100,
+                "critical_gaps": summary["not_satisfied"],
+                "status": "PASSING" if summary["not_satisfied"] <= 5 else "FAILING"
+            }
+
+        # Find common issues across all environments
+        all_failed_controls = {}
+        for env_name, result in results.items():
+            for control in result["assessment"]["controls"]:
+                if control["status"] == "not-satisfied":
+                    ctrl_id = control["control_id"]
+                    if ctrl_id not in all_failed_controls:
+                        all_failed_controls[ctrl_id] = []
+                    all_failed_controls[ctrl_id].append(env_name)
+
+        # Issues present in all environments are systemic
+        report["common_issues"] = [
+            {"control_id": ctrl_id, "environments": envs}
+            for ctrl_id, envs in all_failed_controls.items()
+            if len(envs) == len(results)
+        ]
+
+        return report
+
+# Usage
+assessor = CMMCMultiEnvAssessor(api_key="your_api_key")
+comparison = assessor.assess_environments({
+    "development": "./terraform/dev/terraform.tfstate",
+    "staging": "./terraform/staging/terraform.tfstate",
+    "production": "./terraform/prod/terraform.tfstate"
+})
+
+print(f"Common Issues: {len(comparison['common_issues'])}")
+for env, status in comparison['environments'].items():
+    print(f"{env}: {status['compliance_rate']:.1f}% compliant - {status['status']}")
+```
+
+## CI/CD Integration with GitLab
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - validate
+  - assess
+  - report
+
+variables:
+  CMMC_THRESHOLD: "95"  # Require 95% compliance
+
+cmmc_assessment:
+  stage: assess
+  image: python:3.11-slim
+  before_script:
+    - pip install requests
+  script:
+    - |
+      python3 << EOF
+      import requests
+      import base64
+      import sys
+
+      with open('terraform.tfstate', 'rb') as f:
+          state_content = base64.b64encode(f.read()).decode('utf-8')
+
+      response = requests.post(
+          'https://api.usenabla.com/v1/cmmc',
+          headers={
+              'X-Customer-Key': '$NABLA_API_KEY',
+              'Content-Type': 'application/json'
+          },
+          json={
+              'name': 'GitLab CI Assessment - $CI_COMMIT_SHORT_SHA',
+              'format': 'json',
+              'source_type': 'terraform_state',
+              'source_content': state_content
+          }
+      )
+
+      result = response.json()
+      summary = result['assessment']['summary']
+
+      compliance_rate = (summary['satisfied'] / summary['total_controls']) * 100
+
+      print(f"CMMC Compliance: {compliance_rate:.1f}%")
+      print(f"Satisfied: {summary['satisfied']}/{summary['total_controls']}")
+      print(f"Not Satisfied: {summary['not_satisfied']}")
+
+      if compliance_rate < float('$CMMC_THRESHOLD'):
+          print(f"FAILED: Compliance below threshold ({compliance_rate:.1f}% < $CMMC_THRESHOLD%)")
+          sys.exit(1)
+
+      with open('cmmc_report.json', 'w') as f:
+          import json
+          json.dump(result, f, indent=2)
+      EOF
+  artifacts:
+    reports:
+      dotenv: cmmc_report.json
+    paths:
+      - cmmc_report.json
+    expire_in: 30 days
+  only:
+    - main
+    - merge_requests
+```
+
+## Compliance Monitoring Dashboard
+
+```python
+import json
+from datetime import datetime, timedelta
+from typing import List, Dict
+
+class CMMCComplianceDashboard:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.assessments: List[Dict] = []
+
+    def track_assessment(self, assessment_result: Dict):
+        """Track an assessment for trend analysis."""
+        self.assessments.append({
+            "timestamp": datetime.now().isoformat(),
+            "summary": assessment_result["assessment"]["summary"],
+            "id": assessment_result["id"]
+        })
+
+    def get_compliance_trend(self, days: int = 30) -> Dict:
+        """Calculate compliance trend over time."""
+        cutoff = datetime.now() - timedelta(days=days)
+
+        recent = [
+            a for a in self.assessments
+            if datetime.fromisoformat(a["timestamp"]) > cutoff
+        ]
+
+        if not recent:
+            return {"error": "No recent assessments"}
+
+        trend = []
+        for assessment in recent:
+            s = assessment["summary"]
+            compliance_rate = (s["satisfied"] / s["total_controls"]) * 100
+            trend.append({
+                "date": assessment["timestamp"],
+                "compliance_rate": compliance_rate,
+                "satisfied": s["satisfied"],
+                "not_satisfied": s["not_satisfied"]
+            })
+
+        # Calculate improvement
+        if len(trend) > 1:
+            improvement = trend[-1]["compliance_rate"] - trend[0]["compliance_rate"]
+        else:
+            improvement = 0
+
+        return {
+            "trend": trend,
+            "current_compliance": trend[-1]["compliance_rate"] if trend else 0,
+            "improvement": improvement,
+            "status": "improving" if improvement > 0 else "declining"
+        }
+
+    def export_to_csv(self, filename: str = "cmmc_compliance.csv"):
+        """Export compliance data to CSV for reporting."""
+        import csv
+
+        with open(filename, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                'Date', 'Assessment ID', 'Total Controls',
+                'Satisfied', 'Not Satisfied', 'Compliance %'
+            ])
+
+            for assessment in self.assessments:
+                s = assessment["summary"]
+                compliance = (s["satisfied"] / s["total_controls"]) * 100
+                writer.writerow([
+                    assessment["timestamp"],
+                    assessment["id"],
+                    s["total_controls"],
+                    s["satisfied"],
+                    s["not_satisfied"],
+                    f"{compliance:.2f}"
+                ])
+```
+
+## Best Practices for CMMC Compliance
+
+1. **Continuous Monitoring**: Run assessments on every infrastructure change
+2. **Environment Parity**: Ensure all environments meet the same compliance standards
+3. **Evidence Retention**: Store all assessment artifacts for audit purposes
+4. **Automated Remediation**: Create Terraform modules that enforce CMMC controls
+5. **Third-Party Validation**: Use official C3PAO for certification assessments
+
+## Common CMMC Gaps and Remediation
+
+```python
+REMEDIATION_GUIDES = {
+    "AC.2.007": {
+        "title": "Employ the principle of least privilege",
+        "terraform_fix": """
+resource "aws_iam_policy" "least_privilege" {
+  name = "least-privilege-policy"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:GetObject"]
+      Resource = ["arn:aws:s3:::my-bucket/*"]
+      Condition = {
+        IpAddress = {
+          "aws:SourceIp" = var.allowed_ips
+        }
+      }
+    }]
+  })
+}
+"""
+    },
+    "SC.3.177": {
+        "title": "Employ FIPS-validated cryptography",
+        "terraform_fix": """
+resource "aws_s3_bucket_server_side_encryption_configuration" "fips" {
+  bucket = aws_s3_bucket.main.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.fips_validated.arn
+    }
+  }
+}
+"""
+    }
+}
+```

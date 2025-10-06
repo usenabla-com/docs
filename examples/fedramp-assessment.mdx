@@ -1,0 +1,406 @@
+---
+title: 'FedRAMP Assessment Example'
+description: 'Generate FedRAMP compliance evidence from Terraform state'
+---
+
+# FedRAMP Assessment Implementation
+
+This guide demonstrates how to generate FedRAMP compliance evidence (NIST 800-53) from your infrastructure-as-code using the Nabla Evidence Engine API.
+
+## Basic Usage
+
+### Using Terraform Remote State
+
+```bash
+curl -X POST https://api.usenabla.com/v1/fedramp \
+  -H "X-Customer-Key: your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Production Infrastructure FedRAMP Assessment",
+    "format": "oscal",
+    "source_type": "terraform_state",
+    "source_path": "s3://my-terraform-state/prod/terraform.tfstate",
+    "source_credentials": "{\"aws_access_key_id\":\"AKIA...\",\"aws_secret_access_key\":\"...\"}"
+  }'
+```
+
+### Using Base64-Encoded State File
+
+```bash
+# First, encode your Terraform state file
+STATE_CONTENT=$(cat terraform.tfstate | base64)
+
+# Then submit for assessment
+curl -X POST https://api.usenabla.com/v1/fedramp \
+  -H "X-Customer-Key: your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"Dev Environment FedRAMP Assessment\",
+    \"format\": \"json\",
+    \"source_type\": \"terraform_state\",
+    \"source_content\": \"$STATE_CONTENT\"
+  }"
+```
+
+## Response Structure
+
+```json
+{
+  "id": "assess_fedramp_abc123",
+  "status": "completed",
+  "created_at": "2025-10-05T14:30:00Z",
+  "assessment": {
+    "id": "fedramp_nist80053_20251005",
+    "framework": "NIST 800-53",
+    "version": "Rev 5",
+    "timestamp": "2025-10-05T14:30:15Z",
+    "controls": [
+      {
+        "control_id": "AC-2",
+        "title": "Account Management",
+        "status": "satisfied",
+        "findings": [
+          "IAM policies enforce least privilege access",
+          "MFA enabled for all user accounts"
+        ],
+        "evidence": [
+          "aws_iam_policy: enforce_mfa",
+          "aws_iam_account_password_policy: strict_policy"
+        ]
+      },
+      {
+        "control_id": "SC-7",
+        "title": "Boundary Protection",
+        "status": "not-satisfied",
+        "findings": [
+          "Security groups allow 0.0.0.0/0 ingress on port 22"
+        ],
+        "evidence": [
+          "aws_security_group: web_server_sg (rule: ssh_access)"
+        ]
+      }
+    ],
+    "summary": {
+      "total_controls": 325,
+      "satisfied": 298,
+      "not_satisfied": 15,
+      "not_applicable": 12
+    }
+  },
+  "artifacts": [
+    {
+      "filename": "fedramp_assessment_report.oscal.json",
+      "content_type": "application/json",
+      "content_base64": "eyJjb21wb25lbnQtZGVmaW5pdGlvbiI6...",
+      "size_bytes": 45632
+    }
+  ]
+}
+```
+
+## Python Implementation
+
+```python
+import requests
+import base64
+import json
+from typing import Dict, Any
+
+class FedRAMPAssessor:
+    def __init__(self, api_key: str, base_url: str = "https://api.usenabla.com"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            "X-Customer-Key": api_key,
+            "Content-Type": "application/json"
+        }
+
+    def assess_from_file(self,
+                        statefile_path: str,
+                        name: str,
+                        format: str = "oscal") -> Dict[str, Any]:
+        """Assess FedRAMP compliance from a local Terraform state file."""
+
+        with open(statefile_path, 'rb') as f:
+            state_content = base64.b64encode(f.read()).decode('utf-8')
+
+        payload = {
+            "name": name,
+            "format": format,
+            "source_type": "terraform_state",
+            "source_content": state_content
+        }
+
+        response = requests.post(
+            f"{self.base_url}/v1/fedramp",
+            headers=self.headers,
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def assess_from_remote(self,
+                          remote_path: str,
+                          name: str,
+                          credentials: Dict[str, str],
+                          format: str = "oscal") -> Dict[str, Any]:
+        """Assess FedRAMP compliance from remote Terraform state."""
+
+        payload = {
+            "name": name,
+            "format": format,
+            "source_type": "terraform_state",
+            "source_path": remote_path,
+            "source_credentials": json.dumps(credentials)
+        }
+
+        response = requests.post(
+            f"{self.base_url}/v1/fedramp",
+            headers=self.headers,
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def save_artifacts(self, assessment: Dict[str, Any], output_dir: str = "."):
+        """Save assessment artifacts to disk."""
+        import os
+
+        for artifact in assessment.get("artifacts", []):
+            filename = artifact["filename"]
+            content = base64.b64decode(artifact["content_base64"])
+
+            output_path = os.path.join(output_dir, filename)
+            with open(output_path, 'wb') as f:
+                f.write(content)
+
+            print(f"Saved {filename} ({artifact['size_bytes']} bytes)")
+
+# Usage example
+if __name__ == "__main__":
+    assessor = FedRAMPAssessor(api_key="your_api_key_here")
+
+    # Assess from local file
+    result = assessor.assess_from_file(
+        statefile_path="./terraform.tfstate",
+        name="Production Infrastructure Assessment",
+        format="oscal"
+    )
+
+    # Print summary
+    summary = result["assessment"]["summary"]
+    print(f"FedRAMP Assessment Complete:")
+    print(f"  Total Controls: {summary['total_controls']}")
+    print(f"  Satisfied: {summary['satisfied']}")
+    print(f"  Not Satisfied: {summary['not_satisfied']}")
+    print(f"  Not Applicable: {summary['not_applicable']}")
+
+    # Save artifacts
+    assessor.save_artifacts(result, output_dir="./fedramp_reports")
+```
+
+## GitHub Actions Integration
+
+```yaml
+name: FedRAMP Compliance Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/fedramp.yml'
+
+jobs:
+  assess-compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Generate Terraform State
+        working-directory: ./terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          terraform init
+          terraform plan -out=plan.tfplan
+          terraform show -json plan.tfplan > terraform.tfstate
+
+      - name: Run FedRAMP Assessment
+        env:
+          NABLA_API_KEY: ${{ secrets.NABLA_API_KEY }}
+        run: |
+          STATE_CONTENT=$(cat terraform/terraform.tfstate | base64 | tr -d '\n')
+
+          RESPONSE=$(curl -X POST https://api.usenabla.com/v1/fedramp \
+            -H "X-Customer-Key: $NABLA_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"name\": \"GitHub Actions Assessment - ${{ github.sha }}\",
+              \"format\": \"json\",
+              \"source_type\": \"terraform_state\",
+              \"source_content\": \"$STATE_CONTENT\"
+            }")
+
+          echo "$RESPONSE" > fedramp_assessment.json
+
+      - name: Check Compliance Threshold
+        run: |
+          NOT_SATISFIED=$(jq '.assessment.summary.not_satisfied' fedramp_assessment.json)
+
+          if [ "$NOT_SATISFIED" -gt 10 ]; then
+            echo "❌ FedRAMP compliance check failed: $NOT_SATISFIED controls not satisfied"
+            exit 1
+          else
+            echo "✅ FedRAMP compliance check passed"
+          fi
+
+      - name: Upload Assessment Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: fedramp-assessment
+          path: fedramp_assessment.json
+```
+
+## Terraform Module Integration
+
+```hcl
+# main.tf
+terraform {
+  required_providers {
+    nabla = {
+      source = "nabla/nabla"
+      version = "~> 1.0"
+    }
+  }
+}
+
+provider "nabla" {
+  api_key = var.nabla_api_key
+}
+
+# Run FedRAMP assessment after infrastructure changes
+resource "nabla_fedramp_assessment" "production" {
+  name        = "Production Infrastructure"
+  format      = "oscal"
+  source_type = "terraform_state"
+
+  # Reference the current state
+  source_path = "s3://${var.state_bucket}/prod/terraform.tfstate"
+
+  source_credentials = jsonencode({
+    aws_access_key_id     = var.aws_access_key
+    aws_secret_access_key = var.aws_secret_key
+  })
+
+  # Trigger on infrastructure changes
+  triggers = {
+    infrastructure_hash = sha256(jsonencode([
+      aws_vpc.main.id,
+      aws_security_group.app.id,
+      aws_iam_policy.app.id
+    ]))
+  }
+}
+
+# Output compliance status
+output "fedramp_compliance_status" {
+  value = nabla_fedramp_assessment.production.assessment.summary
+}
+
+# Validation rule - fail if too many controls not satisfied
+resource "null_resource" "compliance_validation" {
+  lifecycle {
+    precondition {
+      condition     = nabla_fedramp_assessment.production.assessment.summary.not_satisfied <= 5
+      error_message = "FedRAMP compliance requires <= 5 unsatisfied controls"
+    }
+  }
+}
+```
+
+## Output Formats
+
+### OSCAL Format
+OSCAL (Open Security Controls Assessment Language) is the standard format for FedRAMP compliance documentation.
+
+```bash
+curl -X POST https://api.usenabla.com/v1/fedramp \
+  -H "X-Customer-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Infrastructure Assessment",
+    "format": "oscal",
+    "source_type": "terraform_state",
+    "source_content": "..."
+  }'
+```
+
+### YAML Format
+Human-readable format for review and version control.
+
+```bash
+curl -X POST https://api.usenabla.com/v1/fedramp \
+  -H "X-Customer-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Infrastructure Assessment",
+    "format": "yaml",
+    "source_type": "terraform_state",
+    "source_content": "..."
+  }'
+```
+
+### JSON Format
+Standard JSON for programmatic processing.
+
+```bash
+curl -X POST https://api.usenabla.com/v1/fedramp \
+  -H "X-Customer-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Infrastructure Assessment",
+    "format": "json",
+    "source_type": "terraform_state",
+    "source_content": "..."
+  }'
+```
+
+## Best Practices
+
+1. **Automate Regular Assessments**: Run FedRAMP assessments on every infrastructure change
+2. **Store Evidence**: Keep assessment artifacts in version control or compliance platforms
+3. **Set Compliance Gates**: Use CI/CD to enforce compliance thresholds
+4. **Monitor Trends**: Track compliance metrics over time
+5. **Remediate Quickly**: Address non-satisfied controls immediately
+
+## Error Handling
+
+```python
+def assess_with_retry(assessor, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            result = assessor.assess_from_file(
+                statefile_path="terraform.tfstate",
+                name="Production Assessment"
+            )
+            return result
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 422:
+                print(f"Validation error: {e.response.json()}")
+                return None
+            elif e.response.status_code == 401:
+                print("Authentication failed - check API key")
+                return None
+            elif attempt < max_retries - 1:
+                print(f"Attempt {attempt + 1} failed, retrying...")
+                time.sleep(2 ** attempt)
+            else:
+                raise
+```

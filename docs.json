@@ -22,19 +22,11 @@
             ]
           },
           {
-            "group": "Examples",
+            "group": "Implementation Examples",
             "pages": [
               "examples/chatbot",
               "examples/code-assistant",
               "examples/knowledge-base"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
             ]
           }
         ]

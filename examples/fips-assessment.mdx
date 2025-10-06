@@ -1,0 +1,625 @@
+---
+title: 'FIPS Cryptographic Assessment'
+description: 'Validate FIPS 140-2/140-3 compliance from infrastructure evidence'
+---
+
+# FIPS Cryptographic Compliance Assessment
+
+Assess your infrastructure's cryptographic compliance with FIPS 140-2 and FIPS 140-3 standards by analyzing multiple evidence sources in a single assessment.
+
+## Overview
+
+The FIPS endpoint accepts a ZIP archive containing various evidence sources and analyzes them for cryptographic compliance:
+
+- **SBOM files** (CycloneDX, SPDX)
+- **Terraform state files**
+- **Kubernetes manifests**
+- **Ansible playbooks**
+- **Package lock files** (npm, poetry, cargo, go.mod)
+- **System information** (OpenSSL versions, crypto policies)
+
+## Quick Start
+
+```bash
+# Create a ZIP archive with your evidence
+zip -r evidence.zip \
+  sbom.json \
+  terraform.tfstate \
+  k8s-manifests/ \
+  package-lock.json
+
+# Encode and submit
+EVIDENCE_CONTENT=$(cat evidence.zip | base64)
+
+curl -X POST https://api.usenabla.com/v1/fips \
+  -H "X-Customer-Key: your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"FIPS Cryptographic Assessment\",
+    \"format\": \"json\",
+    \"zip_content\": \"$EVIDENCE_CONTENT\"
+  }"
+```
+
+## Python Implementation
+
+### Basic Assessment
+
+```python
+import requests
+import base64
+import zipfile
+import io
+import os
+from typing import List, Dict, Any
+
+class FIPSAssessor:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://api.usenabla.com"
+
+    def create_evidence_archive(self, evidence_files: List[str]) -> bytes:
+        """Create a ZIP archive from evidence files."""
+        zip_buffer = io.BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for file_path in evidence_files:
+                if os.path.isfile(file_path):
+                    arcname = os.path.basename(file_path)
+                    zip_file.write(file_path, arcname)
+                elif os.path.isdir(file_path):
+                    # Add directory contents
+                    for root, dirs, files in os.walk(file_path):
+                        for file in files:
+                            full_path = os.path.join(root, file)
+                            arcname = os.path.relpath(full_path, os.path.dirname(file_path))
+                            zip_file.write(full_path, arcname)
+
+        return zip_buffer.getvalue()
+
+    def assess(self,
+               evidence_files: List[str],
+               name: str,
+               format: str = "json") -> Dict[str, Any]:
+        """Run FIPS cryptographic assessment."""
+
+        # Create and encode ZIP archive
+        zip_content = self.create_evidence_archive(evidence_files)
+        zip_base64 = base64.b64encode(zip_content).decode('utf-8')
+
+        # Submit for assessment
+        response = requests.post(
+            f"{self.base_url}/v1/fips",
+            headers={
+                "X-Customer-Key": self.api_key,
+                "Content-Type": "application/json"
+            },
+            json={
+                "name": name,
+                "format": format,
+                "zip_content": zip_base64
+            }
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def analyze_cryptographic_libraries(self, assessment: Dict) -> Dict:
+        """Extract cryptographic library analysis from assessment."""
+        crypto_findings = {
+            "fips_validated": [],
+            "non_fips": [],
+            "deprecated": [],
+            "recommendations": []
+        }
+
+        for control in assessment["assessment"]["controls"]:
+            if "crypt" in control["title"].lower():
+                if control["status"] == "satisfied":
+                    crypto_findings["fips_validated"].extend(control["evidence"])
+                else:
+                    crypto_findings["non_fips"].extend(control["findings"])
+
+        return crypto_findings
+
+# Usage
+assessor = FIPSAssessor(api_key="your_api_key")
+
+evidence = [
+    "./sbom.json",
+    "./terraform.tfstate",
+    "./kubernetes/",
+    "./package-lock.json"
+]
+
+result = assessor.assess(
+    evidence_files=evidence,
+    name="Production FIPS Assessment",
+    format="oscal"
+)
+
+print(f"Status: {result['status']}")
+print(f"Controls: {result['assessment']['summary']}")
+```
+
+### Advanced Multi-Source Assessment
+
+```python
+class AdvancedFIPSAssessor(FIPSAssessor):
+
+    def assess_application_stack(self,
+                                 sbom_path: str,
+                                 terraform_path: str,
+                                 k8s_manifests_dir: str,
+                                 package_locks: List[str]) -> Dict:
+        """
+        Comprehensive FIPS assessment of entire application stack.
+
+        Analyzes:
+        - Dependencies from SBOM
+        - Infrastructure crypto from Terraform
+        - Container crypto from K8s
+        - Language-specific packages
+        """
+
+        # Collect all evidence
+        evidence = [sbom_path, terraform_path, k8s_manifests_dir] + package_locks
+
+        # Run assessment
+        assessment = self.assess(
+            evidence_files=evidence,
+            name="Full Stack FIPS Assessment",
+            format="json"
+        )
+
+        # Categorize findings by layer
+        return self.categorize_by_layer(assessment)
+
+    def categorize_by_layer(self, assessment: Dict) -> Dict:
+        """Categorize FIPS findings by application layer."""
+        layers = {
+            "infrastructure": {"controls": [], "status": "unknown"},
+            "runtime": {"controls": [], "status": "unknown"},
+            "dependencies": {"controls": [], "status": "unknown"},
+            "system": {"controls": [], "status": "unknown"}
+        }
+
+        for control in assessment["assessment"]["controls"]:
+            evidence_str = " ".join(control.get("evidence", [])).lower()
+
+            # Categorize by evidence source
+            if any(kw in evidence_str for kw in ["terraform", "aws_", "azure_", "gcp_"]):
+                layers["infrastructure"]["controls"].append(control)
+            elif any(kw in evidence_str for kw in ["kubernetes", "container", "docker"]):
+                layers["runtime"]["controls"].append(control)
+            elif any(kw in evidence_str for kw in ["npm", "pip", "cargo", "go.mod"]):
+                layers["dependencies"]["controls"].append(control)
+            else:
+                layers["system"]["controls"].append(control)
+
+        # Determine layer status
+        for layer_name, layer_data in layers.items():
+            controls = layer_data["controls"]
+            if not controls:
+                layer_data["status"] = "no_evidence"
+            elif all(c["status"] == "satisfied" for c in controls):
+                layer_data["status"] = "compliant"
+            else:
+                layer_data["status"] = "non_compliant"
+
+        return {
+            "overall_status": assessment["status"],
+            "layers": layers,
+            "summary": assessment["assessment"]["summary"]
+        }
+
+    def generate_remediation_plan(self, assessment: Dict) -> List[Dict]:
+        """Generate actionable remediation plan for FIPS compliance."""
+        remediation_plan = []
+
+        for control in assessment["assessment"]["controls"]:
+            if control["status"] == "not-satisfied":
+                remediation = {
+                    "control_id": control["control_id"],
+                    "title": control["title"],
+                    "priority": self.calculate_priority(control),
+                    "findings": control["findings"],
+                    "recommended_actions": self.get_recommended_actions(control)
+                }
+                remediation_plan.append(remediation)
+
+        # Sort by priority
+        remediation_plan.sort(key=lambda x: x["priority"], reverse=True)
+
+        return remediation_plan
+
+    def calculate_priority(self, control: Dict) -> int:
+        """Calculate remediation priority (1-10)."""
+        priority = 5  # Base priority
+
+        # Increase priority for crypto-specific controls
+        if any(kw in control["title"].lower() for kw in ["encrypt", "crypto", "tls", "ssl"]):
+            priority += 3
+
+        # Increase for infrastructure controls
+        evidence_str = " ".join(control.get("evidence", [])).lower()
+        if any(kw in evidence_str for kw in ["production", "prod", "public"]):
+            priority += 2
+
+        return min(priority, 10)
+
+    def get_recommended_actions(self, control: Dict) -> List[str]:
+        """Get specific remediation actions for a control."""
+        actions = []
+
+        control_id = control["control_id"]
+        findings = " ".join(control.get("findings", [])).lower()
+
+        # Crypto library recommendations
+        if "openssl" in findings:
+            if "1.0" in findings or "1.1" in findings:
+                actions.append("Upgrade OpenSSL to version 3.0+ with FIPS module")
+                actions.append("Enable FIPS mode in OpenSSL configuration")
+
+        if "md5" in findings or "sha1" in findings:
+            actions.append("Replace MD5/SHA1 with SHA-256 or SHA-3")
+            actions.append("Update code to use FIPS-approved hash functions")
+
+        if "des" in findings or "3des" in findings:
+            actions.append("Replace DES/3DES with AES-256")
+            actions.append("Update encryption configurations")
+
+        # TLS recommendations
+        if "tls" in findings and ("1.0" in findings or "1.1" in findings):
+            actions.append("Enforce TLS 1.2 or 1.3 minimum")
+            actions.append("Disable older TLS versions in load balancers and services")
+
+        # AWS KMS recommendations
+        if "kms" in findings:
+            actions.append("Verify KMS keys are in FIPS 140-2 Level 2 regions")
+            actions.append("Enable automatic key rotation")
+
+        if not actions:
+            actions.append("Review control requirements and update infrastructure")
+            actions.append("Consult FIPS 140-2/140-3 implementation guide")
+
+        return actions
+
+# Advanced usage example
+assessor = AdvancedFIPSAssessor(api_key="your_api_key")
+
+# Full stack assessment
+stack_assessment = assessor.assess_application_stack(
+    sbom_path="./sbom.cyclonedx.json",
+    terraform_path="./infrastructure/terraform.tfstate",
+    k8s_manifests_dir="./kubernetes/",
+    package_locks=[
+        "./package-lock.json",
+        "./requirements.txt",
+        "./Cargo.lock"
+    ]
+)
+
+# Print layer-by-layer results
+for layer_name, layer_data in stack_assessment["layers"].items():
+    print(f"\n{layer_name.upper()}: {layer_data['status']}")
+    print(f"  Controls: {len(layer_data['controls'])}")
+
+# Generate remediation plan
+remediation = assessor.generate_remediation_plan(stack_assessment)
+
+print(f"\nRemediation Items: {len(remediation)}")
+for item in remediation[:5]:  # Top 5 priorities
+    print(f"\n[Priority {item['priority']}] {item['control_id']}: {item['title']}")
+    for action in item['recommended_actions']:
+        print(f"  - {action}")
+```
+
+## Evidence Collection Automation
+
+### SBOM Generation
+
+```bash
+#!/bin/bash
+# generate_sbom.sh - Generate SBOM for FIPS assessment
+
+# For Node.js projects
+if [ -f "package.json" ]; then
+    npx @cyclonedx/cyclonedx-npm --output-file sbom-npm.json
+fi
+
+# For Python projects
+if [ -f "requirements.txt" ]; then
+    pip install cyclonedx-bom
+    cyclonedx-py -i requirements.txt -o sbom-python.json
+fi
+
+# For Go projects
+if [ -f "go.mod" ]; then
+    go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+    cyclonedx-gomod mod -json -output sbom-go.json
+fi
+
+# For Rust projects
+if [ -f "Cargo.toml" ]; then
+    cargo install cargo-cyclonedx
+    cargo cyclonedx -f json
+fi
+
+echo "SBOM generation complete"
+```
+
+### System Crypto Information
+
+```python
+import subprocess
+import json
+
+def collect_system_crypto_info():
+    """Collect system cryptographic information for FIPS assessment."""
+
+    info = {
+        "openssl_version": None,
+        "fips_mode": None,
+        "crypto_policies": None,
+        "kernel_crypto": None
+    }
+
+    try:
+        # OpenSSL version
+        result = subprocess.run(
+            ["openssl", "version"],
+            capture_output=True,
+            text=True
+        )
+        info["openssl_version"] = result.stdout.strip()
+
+        # FIPS mode check
+        result = subprocess.run(
+            ["openssl", "md5", "/dev/null"],
+            capture_output=True,
+            text=True
+        )
+        info["fips_mode"] = "disabled" if result.returncode == 0 else "enabled"
+
+        # Crypto policies (RHEL/Fedora)
+        try:
+            with open("/etc/crypto-policies/config", "r") as f:
+                info["crypto_policies"] = f.read().strip()
+        except FileNotFoundError:
+            info["crypto_policies"] = "not_configured"
+
+        # Available kernel crypto algorithms
+        try:
+            with open("/proc/crypto", "r") as f:
+                crypto_data = f.read()
+                info["kernel_crypto"] = len([
+                    line for line in crypto_data.split("\n")
+                    if line.startswith("name")
+                ])
+        except FileNotFoundError:
+            info["kernel_crypto"] = "unavailable"
+
+    except Exception as e:
+        print(f"Error collecting crypto info: {e}")
+
+    # Save to file
+    with open("system_crypto_info.json", "w") as f:
+        json.dump(info, f, indent=2)
+
+    return info
+```
+
+## CI/CD Integration
+
+### GitHub Actions Workflow
+
+```yaml
+name: FIPS Cryptographic Compliance
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Run weekly
+    - cron: '0 0 * * 0'
+
+jobs:
+  fips-assessment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install SBOM tools
+        run: |
+          npm install -g @cyclonedx/cyclonedx-npm
+          pip install cyclonedx-bom
+
+      - name: Generate SBOMs
+        run: |
+          # Node.js dependencies
+          if [ -f "package.json" ]; then
+            cyclonedx-npm --output-file sbom-npm.json
+          fi
+
+          # Python dependencies
+          if [ -f "requirements.txt" ]; then
+            cyclonedx-py -i requirements.txt -o sbom-python.json
+          fi
+
+      - name: Collect Terraform state
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          # Pull Terraform state
+          terraform init
+          terraform show -json > terraform.tfstate.json
+
+      - name: Collect system info
+        run: |
+          # System crypto information
+          openssl version > system_info.txt
+          cat /etc/os-release >> system_info.txt
+
+      - name: Create evidence archive
+        run: |
+          zip -r evidence.zip \
+            sbom-*.json \
+            terraform.tfstate.json \
+            kubernetes/ \
+            package-lock.json \
+            system_info.txt \
+            2>/dev/null || true
+
+      - name: Run FIPS Assessment
+        id: fips
+        env:
+          NABLA_API_KEY: ${{ secrets.NABLA_API_KEY }}
+        run: |
+          EVIDENCE_CONTENT=$(cat evidence.zip | base64 | tr -d '\n')
+
+          RESPONSE=$(curl -X POST https://api.usenabla.com/v1/fips \
+            -H "X-Customer-Key: $NABLA_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"name\": \"FIPS Assessment - ${{ github.sha }}\",
+              \"format\": \"json\",
+              \"zip_content\": \"$EVIDENCE_CONTENT\"
+            }")
+
+          echo "$RESPONSE" > fips_assessment.json
+
+          # Extract compliance status
+          NOT_SATISFIED=$(echo "$RESPONSE" | jq '.assessment.summary.not_satisfied')
+          TOTAL=$(echo "$RESPONSE" | jq '.assessment.summary.total_controls')
+          COMPLIANCE=$((100 * (TOTAL - NOT_SATISFIED) / TOTAL))
+
+          echo "compliance=$COMPLIANCE" >> $GITHUB_OUTPUT
+          echo "not_satisfied=$NOT_SATISFIED" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const compliance = ${{ steps.fips.outputs.compliance }};
+            const notSatisfied = ${{ steps.fips.outputs.not_satisfied }};
+
+            const comment = `## FIPS Cryptographic Assessment
+
+            - **Compliance Rate**: ${compliance}%
+            - **Non-Compliant Controls**: ${notSatisfied}
+            - **Status**: ${compliance >= 95 ? '✅ PASSING' : '❌ FAILING'}
+
+            See artifacts for full report.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Upload Assessment Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: fips-assessment
+          path: |
+            fips_assessment.json
+            evidence.zip
+          retention-days: 90
+
+      - name: Fail on non-compliance
+        if: steps.fips.outputs.compliance < 95
+        run: |
+          echo "❌ FIPS compliance below threshold: ${{ steps.fips.outputs.compliance }}%"
+          exit 1
+```
+
+## Container Image Assessment
+
+```python
+def assess_container_images(image_tags: List[str], api_key: str):
+    """
+    Assess FIPS compliance of container images.
+
+    Generates SBOMs from containers and assesses cryptographic compliance.
+    """
+    import docker
+    import tempfile
+
+    client = docker.from_env()
+    evidence_files = []
+
+    for image_tag in image_tags:
+        print(f"Analyzing {image_tag}...")
+
+        # Pull image
+        image = client.images.pull(image_tag)
+
+        # Generate SBOM using syft
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            subprocess.run([
+                "syft",
+                f"docker:{image_tag}",
+                "-o", "cyclonedx-json",
+                "--file", f.name
+            ])
+            evidence_files.append(f.name)
+
+    # Run FIPS assessment
+    assessor = FIPSAssessor(api_key=api_key)
+    return assessor.assess(
+        evidence_files=evidence_files,
+        name="Container Images FIPS Assessment"
+    )
+```
+
+## Compliance Reporting
+
+```python
+def generate_fips_compliance_report(assessment: Dict, output_path: str):
+    """Generate executive FIPS compliance report."""
+
+    from datetime import datetime
+    import json
+
+    report = f"""
+# FIPS 140-2/140-3 Cryptographic Compliance Report
+
+**Assessment ID**: {assessment['id']}
+**Date**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Status**: {assessment['status']}
+
+## Executive Summary
+
+- **Total Controls Assessed**: {assessment['assessment']['summary']['total_controls']}
+- **Compliant Controls**: {assessment['assessment']['summary']['satisfied']}
+- **Non-Compliant Controls**: {assessment['assessment']['summary']['not_satisfied']}
+- **Not Applicable**: {assessment['assessment']['summary']['not_applicable']}
+
+### Compliance Rate
+{(assessment['assessment']['summary']['satisfied'] / assessment['assessment']['summary']['total_controls'] * 100):.1f}%
+
+## Critical Findings
+
+"""
+
+    critical_controls = [
+        c for c in assessment['assessment']['controls']
+        if c['status'] == 'not-satisfied' and
+        any(kw in c['title'].lower() for kw in ['encrypt', 'crypto', 'key'])
+    ]
+
+    for control in critical_controls[:10]:
+        report += f"\n### {control['control_id']}: {control['title']}\n"
+        for finding in control['findings']:
+            report += f"- {finding}\n"
+
+    with open(output_path, 'w') as f:
+        f.write(report)
+
+    print(f"Report generated: {output_path}")
+```

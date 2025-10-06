@@ -1,0 +1,639 @@
+---
+title: 'Architecture Diagram Generation'
+description: 'Generate Mermaid diagrams from Terraform state using AI'
+---
+
+# AI-Powered Architecture Diagram Generation
+
+Automatically generate Mermaid architecture diagrams from your Terraform state files using AI analysis.
+
+## Quick Start
+
+```bash
+curl -X POST https://api.usenabla.com/v1/diagram \
+  -H "X-Customer-Key: your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Production Architecture",
+    "statefile_path": "s3://terraform-states/prod/terraform.tfstate"
+  }'
+```
+
+## Python Implementation
+
+### Basic Diagram Generation
+
+```python
+import requests
+import base64
+from typing import Dict, Optional
+
+class DiagramGenerator:
+    def __init__(self, api_key: str, base_url: str = "https://api.usenabla.com"):
+        self.api_key = api_key
+        self.base_url = base_url
+
+    def generate_from_file(self,
+                          statefile_path: str,
+                          name: str,
+                          model: Optional[str] = None) -> Dict:
+        """Generate architecture diagram from local Terraform state."""
+
+        with open(statefile_path, 'rb') as f:
+            state_content = base64.b64encode(f.read()).decode('utf-8')
+
+        payload = {
+            "name": name,
+            "statefile_content": state_content
+        }
+
+        if model:
+            payload["model"] = model
+
+        response = requests.post(
+            f"{self.base_url}/v1/diagram",
+            headers={
+                "X-Customer-Key": self.api_key,
+                "Content-Type": "application/json"
+            },
+            json=payload
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def generate_from_remote(self,
+                            remote_path: str,
+                            name: str,
+                            model: Optional[str] = None) -> Dict:
+        """Generate architecture diagram from remote Terraform state."""
+
+        payload = {
+            "name": name,
+            "statefile_path": remote_path
+        }
+
+        if model:
+            payload["model"] = model
+
+        response = requests.post(
+            f"{self.base_url}/v1/diagram",
+            headers={
+                "X-Customer-Key": self.api_key,
+                "Content-Type": "application/json"
+            },
+            json=payload
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def save_diagram(self, result: Dict, output_path: str = "architecture.mmd"):
+        """Save Mermaid diagram to file."""
+
+        with open(output_path, 'w') as f:
+            f.write(result["mermaid_content"])
+
+        print(f"Diagram saved to {output_path}")
+        print(f"Nodes: {result['metadata']['node_count']}")
+        print(f"Edges: {result['metadata']['edge_count']}")
+
+        return output_path
+
+    def render_to_svg(self, mermaid_file: str, output_svg: str = "architecture.svg"):
+        """Render Mermaid diagram to SVG using mmdc CLI."""
+        import subprocess
+
+        try:
+            subprocess.run([
+                "mmdc",
+                "-i", mermaid_file,
+                "-o", output_svg,
+                "-b", "transparent"
+            ], check=True)
+            print(f"SVG rendered to {output_svg}")
+        except FileNotFoundError:
+            print("Error: mermaid-cli not installed. Run: npm install -g @mermaid-js/mermaid-cli")
+        except subprocess.CalledProcessError as e:
+            print(f"Error rendering diagram: {e}")
+
+# Usage
+generator = DiagramGenerator(api_key="your_api_key")
+
+result = generator.generate_from_file(
+    statefile_path="./terraform.tfstate",
+    name="AWS Production Infrastructure"
+)
+
+# Save and render
+mmd_file = generator.save_diagram(result)
+generator.render_to_svg(mmd_file)
+```
+
+## Advanced Usage with Custom AI Models
+
+```python
+class AdvancedDiagramGenerator(DiagramGenerator):
+
+    def generate_with_custom_model(self,
+                                   statefile_path: str,
+                                   name: str,
+                                   model: str = "@cf/openai/gpt-oss-120b",
+                                   api_key: Optional[str] = None) -> Dict:
+        """
+        Generate diagram using a custom AI model.
+
+        Supported models:
+        - @cf/openai/gpt-oss-120b (default)
+        - @cf/meta/llama-3.1-70b-instruct
+        - @cf/anthropic/claude-3-5-sonnet
+        """
+
+        with open(statefile_path, 'rb') as f:
+            state_content = base64.b64encode(f.read()).decode('utf-8')
+
+        payload = {
+            "name": name,
+            "statefile_content": state_content,
+            "model": model
+        }
+
+        if api_key:
+            payload["api_key"] = api_key
+
+        response = requests.post(
+            f"{self.base_url}/v1/diagram",
+            headers={
+                "X-Customer-Key": self.api_key,
+                "Content-Type": "application/json"
+            },
+            json=payload
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def generate_multiple_views(self, statefile_path: str, name: str) -> Dict[str, Dict]:
+        """
+        Generate multiple diagram views from the same infrastructure.
+
+        Creates:
+        - Network topology view
+        - Security groups view
+        - Data flow view
+        - Service dependency view
+        """
+
+        views = {}
+
+        # Use different AI prompting for different views
+        # This would be handled server-side based on naming conventions
+
+        views["network"] = self.generate_from_file(
+            statefile_path,
+            f"{name} - Network Topology"
+        )
+
+        views["security"] = self.generate_from_file(
+            statefile_path,
+            f"{name} - Security Architecture"
+        )
+
+        views["services"] = self.generate_from_file(
+            statefile_path,
+            f"{name} - Service Dependencies"
+        )
+
+        return views
+
+    def compare_infrastructure_versions(self,
+                                       old_state: str,
+                                       new_state: str,
+                                       name: str) -> Dict:
+        """Generate diagrams showing infrastructure changes."""
+
+        old_diagram = self.generate_from_file(old_state, f"{name} - Before")
+        new_diagram = self.generate_from_file(new_state, f"{name} - After")
+
+        return {
+            "before": old_diagram,
+            "after": new_diagram,
+            "changes": {
+                "nodes_added": new_diagram["metadata"]["node_count"] -
+                              old_diagram["metadata"]["node_count"],
+                "edges_added": new_diagram["metadata"]["edge_count"] -
+                              old_diagram["metadata"]["edge_count"]
+            }
+        }
+
+# Usage
+generator = AdvancedDiagramGenerator(api_key="your_api_key")
+
+# Generate with custom model
+result = generator.generate_with_custom_model(
+    statefile_path="./terraform.tfstate",
+    name="Production Infrastructure",
+    model="@cf/meta/llama-3.1-70b-instruct"
+)
+
+# Generate multiple views
+views = generator.generate_multiple_views(
+    statefile_path="./terraform.tfstate",
+    name="Production Infrastructure"
+)
+
+for view_name, view_data in views.items():
+    generator.save_diagram(view_data, f"architecture_{view_name}.mmd")
+```
+
+## Diagram Customization
+
+### Post-Processing Diagrams
+
+```python
+def customize_diagram(mermaid_content: str,
+                     theme: str = "default",
+                     direction: str = "TB") -> str:
+    """
+    Customize generated Mermaid diagram.
+
+    Args:
+        mermaid_content: Original Mermaid diagram
+        theme: Mermaid theme (default, dark, forest, neutral)
+        direction: Graph direction (TB, BT, LR, RL)
+    """
+
+    lines = mermaid_content.split('\n')
+
+    # Update graph direction
+    if lines[0].startswith('graph '):
+        lines[0] = f'graph {direction}'
+
+    # Add theme configuration
+    theme_config = f"""
+%%{{init: {{'theme':'{theme}'}}}}%%
+"""
+
+    # Insert theme after first line
+    lines.insert(1, theme_config)
+
+    return '\n'.join(lines)
+
+def add_security_annotations(mermaid_content: str,
+                            security_groups: Dict) -> str:
+    """Add security group annotations to diagram."""
+
+    lines = mermaid_content.split('\n')
+    annotations = []
+
+    for sg_name, sg_rules in security_groups.items():
+        # Add visual indicators for security boundaries
+        if 'public' in sg_name.lower():
+            annotations.append(f'    {sg_name}:::publicClass')
+        elif 'private' in sg_name.lower():
+            annotations.append(f'    {sg_name}:::privateClass')
+
+    # Add class definitions
+    class_defs = """
+    classDef publicClass fill:#ff6b6b,stroke:#c92a2a
+    classDef privateClass fill:#51cf66,stroke:#2f9e44
+"""
+
+    lines.extend(annotations)
+    lines.append(class_defs)
+
+    return '\n'.join(lines)
+
+# Usage
+result = generator.generate_from_file(
+    statefile_path="./terraform.tfstate",
+    name="Production"
+)
+
+# Customize diagram
+customized = customize_diagram(
+    result["mermaid_content"],
+    theme="dark",
+    direction="LR"
+)
+
+# Add security annotations
+security_groups = {
+    "public_web_sg": {"ingress": ["80", "443"]},
+    "private_app_sg": {"ingress": ["8080"]},
+    "private_db_sg": {"ingress": ["5432"]}
+}
+
+annotated = add_security_annotations(customized, security_groups)
+
+# Save
+with open("architecture_customized.mmd", 'w') as f:
+    f.write(annotated)
+```
+
+## Documentation Generation
+
+### Automated Architecture Documentation
+
+```python
+def generate_architecture_docs(statefile_path: str,
+                              api_key: str,
+                              output_dir: str = "./docs"):
+    """
+    Generate complete architecture documentation with diagrams.
+    """
+    import os
+    import json
+    from datetime import datetime
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Generate diagram
+    generator = DiagramGenerator(api_key=api_key)
+    result = generator.generate_from_file(
+        statefile_path=statefile_path,
+        name="Infrastructure Architecture"
+    )
+
+    # Save Mermaid diagram
+    mmd_path = os.path.join(output_dir, "architecture.mmd")
+    with open(mmd_path, 'w') as f:
+        f.write(result["mermaid_content"])
+
+    # Generate markdown documentation
+    doc = f"""# Infrastructure Architecture Documentation
+
+**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Source**: {statefile_path}
+
+## Overview
+
+This document provides an architectural overview of the infrastructure defined in Terraform.
+
+### Statistics
+
+- **Nodes**: {result['metadata']['node_count']}
+- **Connections**: {result['metadata']['edge_count']}
+- **Title**: {result['metadata']['title']}
+
+## Architecture Diagram
+
+```mermaid
+{result['mermaid_content']}
+```
+
+## Component Details
+
+### Resources
+The infrastructure consists of {result['metadata']['node_count']} managed resources.
+
+### Network Topology
+The architecture shows {result['metadata']['edge_count']} connections between components.
+
+## Generated Files
+
+- `architecture.mmd` - Mermaid diagram source
+- `architecture.svg` - Rendered diagram (generate with `mmdc -i architecture.mmd -o architecture.svg`)
+- `metadata.json` - Diagram metadata
+
+---
+*Generated by Nabla Evidence Engine*
+"""
+
+    # Save documentation
+    doc_path = os.path.join(output_dir, "ARCHITECTURE.md")
+    with open(doc_path, 'w') as f:
+        f.write(doc)
+
+    # Save metadata
+    metadata_path = os.path.join(output_dir, "metadata.json")
+    with open(metadata_path, 'w') as f:
+        json.dump(result['metadata'], f, indent=2)
+
+    print(f"Documentation generated in {output_dir}/")
+    return output_dir
+
+# Usage
+generate_architecture_docs(
+    statefile_path="./terraform.tfstate",
+    api_key="your_api_key",
+    output_dir="./architecture_docs"
+)
+```
+
+## CI/CD Integration
+
+### GitHub Actions - Auto-Generate Diagrams
+
+```yaml
+name: Update Architecture Diagrams
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+
+jobs:
+  generate-diagrams:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Generate Terraform State
+        working-directory: ./terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          terraform init
+          terraform plan -out=plan.tfplan
+          terraform show -json plan.tfplan > terraform.tfstate.json
+
+      - name: Generate Architecture Diagram
+        env:
+          NABLA_API_KEY: ${{ secrets.NABLA_API_KEY }}
+        run: |
+          STATE_CONTENT=$(cat terraform/terraform.tfstate.json | base64 | tr -d '\n')
+
+          RESPONSE=$(curl -X POST https://api.usenabla.com/v1/diagram \
+            -H "X-Customer-Key: $NABLA_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"name\": \"Production Infrastructure\",
+              \"statefile_content\": \"$STATE_CONTENT\"
+            }")
+
+          echo "$RESPONSE" | jq -r '.mermaid_content' > docs/architecture.mmd
+          echo "$RESPONSE" | jq '.metadata' > docs/architecture-metadata.json
+
+      - name: Render Diagram to SVG
+        run: |
+          mmdc -i docs/architecture.mmd \
+               -o docs/architecture.svg \
+               -b transparent \
+               -t dark
+
+      - name: Render Diagram to PNG
+        run: |
+          mmdc -i docs/architecture.mmd \
+               -o docs/architecture.png \
+               -b white \
+               -w 2000
+
+      - name: Commit Updated Diagrams
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/architecture.*
+          git diff --quiet && git diff --staged --quiet || \
+            git commit -m "docs: update architecture diagrams [skip ci]"
+          git push
+```
+
+## Interactive Diagram Viewer
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Infrastructure Architecture</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            securityLevel: 'loose'
+        });
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #fff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        .mermaid {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Infrastructure Architecture</h1>
+
+        <div class="controls">
+            <button onclick="refreshDiagram()">Refresh</button>
+            <button onclick="downloadSVG()">Download SVG</button>
+            <button onclick="changeTheme()">Toggle Theme</button>
+        </div>
+
+        <div class="mermaid" id="diagram">
+            <!-- Diagram will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        async function loadDiagram() {
+            const response = await fetch('architecture.mmd');
+            const mermaidCode = await response.text();
+            document.getElementById('diagram').textContent = mermaidCode;
+            mermaid.init(undefined, document.querySelector('.mermaid'));
+        }
+
+        function downloadSVG() {
+            const svg = document.querySelector('.mermaid svg');
+            const blob = new Blob([svg.outerHTML], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'architecture.svg';
+            a.click();
+        }
+
+        function changeTheme() {
+            // Toggle between themes
+            const currentTheme = mermaid.initialize().theme;
+            const newTheme = currentTheme === 'dark' ? 'default' : 'dark';
+            mermaid.initialize({ theme: newTheme });
+            location.reload();
+        }
+
+        function refreshDiagram() {
+            location.reload();
+        }
+
+        loadDiagram();
+    </script>
+</body>
+</html>
+```
+
+## Best Practices
+
+1. **Version Control**: Store generated diagrams in git to track infrastructure evolution
+2. **Automation**: Auto-generate diagrams on every infrastructure change
+3. **Multiple Views**: Create different diagram perspectives (network, security, services)
+4. **Documentation**: Include diagrams in architecture documentation
+5. **CI/CD Gates**: Use diagrams for infrastructure review in PRs
+
+## Error Handling
+
+```python
+def generate_with_retry(generator: DiagramGenerator,
+                       statefile_path: str,
+                       max_retries: int = 3) -> Dict:
+    """Generate diagram with retry logic."""
+
+    for attempt in range(max_retries):
+        try:
+            return generator.generate_from_file(
+                statefile_path=statefile_path,
+                name="Infrastructure"
+            )
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 422:
+                print(f"Invalid state file: {e.response.json()}")
+                return None
+            elif attempt < max_retries - 1:
+                print(f"Attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(2 ** attempt)
+            else:
+                raise
+```
