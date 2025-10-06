@@ -22,7 +22,7 @@
             ]
           },
           {
-            "group": "Implementation Examples",
+            "group": "Usage Examples",
             "pages": [
               "examples/fedramp-assessment",
               "examples/cmmc-assessment",
@@ -40,6 +40,15 @@
             "group": "API documentation",
             "pages": [
               "api-reference/introduction"
+            ]
+          },
+          {
+            "group": "Control Mapping Schemas",
+            "pages": [
+              "api-reference/schemas/500-53",
+              "api-reference/schemas/800-171",
+              "api-reference/schemas/800-172",
+              "api-reference/schemas/fips-140-3"
             ]
           }
         ]

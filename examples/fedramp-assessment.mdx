@@ -1,28 +1,11 @@
 ---
-title: 'FedRAMP Assessments-as-code'
+title: 'Programmatic FedRamp Assessments'
 description: 'Generate FedRAMP compliance evidence from Terraform state'
 ---
-
-# FedRAMP Assessment Implementation
 
 This guide demonstrates how to generate FedRAMP compliance evidence (NIST 800-53) from your infrastructure-as-code using the Nabla Evidence Engine API.
 
 ## Basic Usage
-
-### Using Terraform Remote State
-
-```bash
-curl -X POST https://api.usenabla.com/v1/fedramp \
-  -H "X-Customer-Key: your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Production Infrastructure FedRAMP Assessment",
-    "format": "oscal",
-    "source_type": "terraform_state",
-    "source_path": "s3://my-terraform-state/prod/terraform.tfstate",
-    "source_credentials": "{\"aws_access_key_id\":\"AKIA...\",\"aws_secret_access_key\":\"...\"}"
-  }'
-```
 
 ### Using Base64-Encoded State File
 

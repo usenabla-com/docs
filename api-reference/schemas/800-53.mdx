@@ -1,0 +1,231 @@
+---
+title: "NIST 800-53 Rev 5"
+description: "Security and Privacy Controls for Information Systems and Organizations"
+---
+
+## Overview
+
+NIST Special Publication 800-53 Revision 5 provides a comprehensive catalog of security and privacy controls for information systems and organizations. Nabla's automated assessment analyzes your infrastructure-as-code (IaC) to evaluate compliance against key NIST 800-53 controls.
+
+## Framework Details
+
+- **Framework**: NIST 800-53
+- **Version**: Revision 5
+- **Baseline**: Moderate (expandable to Low/High)
+- **Output Format**: OSCAL Assessment Results (JSON)
+
+## Assessed Control Families
+
+### Access Control (AC)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| AC-2 | Account Management | Detects IAM users, roles, and groups |
+| AC-3 | Access Enforcement | Evaluates IAM policies and security groups |
+| AC-4 | Information Flow Enforcement | Analyzes network controls (VPCs, subnets, NACLs) |
+| AC-6 | Least Privilege | Identifies overly permissive wildcard (*) policies |
+
+### Audit and Accountability (AU)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| AU-2 | Event Logging | Detects CloudTrail, CloudWatch, S3 bucket logging |
+| AU-9 | Protection of Audit Information | Verifies log storage encryption and versioning |
+
+### Security Assessment and Authorization (CA)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| CA-7 | Continuous Monitoring | Identifies CloudWatch alarms, AWS Config, GuardDuty |
+
+### Configuration Management (CM)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| CM-2 | Baseline Configuration | Infrastructure-as-code represents versioned baselines |
+
+### Contingency Planning (CP)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| CP-9 | System Backup | Detects AWS Backup vaults/plans, database backup retention |
+
+### Identification and Authentication (IA)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| IA-2 | Identification and Authentication | Analyzes IAM users, roles, Cognito user pools |
+| IA-5 | Authenticator Management | Detects access keys, login profiles, Cognito domains |
+
+### System and Communications Protection (SC)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| SC-7 | Boundary Protection | Evaluates security groups, NACLs, VPCs |
+| SC-8 | Transmission Confidentiality | Verifies HTTPS listeners, S3 encryption in transit |
+| SC-13 | Cryptographic Protection | Identifies KMS keys and encryption mechanisms |
+
+### System and Information Integrity (SI)
+
+| Control | Title | Assessment Method |
+|---------|-------|-------------------|
+| SI-4 | System Monitoring | Detects CloudWatch, GuardDuty, AWS Config |
+
+## Evidence Collection
+
+The assessor automatically extracts evidence from your infrastructure resources:
+
+```json
+{
+  "evidence": [
+    "IAM resource: aws_iam_user.admin",
+    "Access control resource: aws_security_group.web_tier",
+    "Logging resource: aws_cloudtrail.main",
+    "Encryption key: aws_kms_key.data_key"
+  ]
+}
+```
+
+## Compliance Status
+
+Each control is assigned one of three statuses:
+
+- **Satisfied**: Required controls are properly configured
+- **NotSatisfied**: Controls are missing or misconfigured
+- **NotApplicable**: Control cannot be assessed from IaC
+
+## Current Infrastructure Coverage
+
+<Note>
+**AWS-First Approach**: The current implementation focuses on AWS resources as a starting point. We are actively expanding support for:
+- Azure (azurerm_* resources)
+- Google Cloud Platform (google_* resources)
+- Kubernetes and container infrastructure
+- Multi-cloud architectures
+
+If you have specific resource types you'd like to see supported, please reach out to our team.
+</Note>
+
+### Supported AWS Resources
+
+The assessor currently recognizes these AWS resource types:
+
+**Identity & Access Management**
+- `aws_iam_user`, `aws_iam_role`, `aws_iam_group`
+- `aws_iam_policy`, `aws_iam_role_policy`, `aws_iam_policy_attachment`
+- `aws_iam_access_key`, `aws_iam_user_login_profile`
+- `aws_cognito_user_pool`, `aws_cognito_user_pool_domain`
+
+**Networking**
+- `aws_vpc`, `aws_subnet`, `aws_route_table`
+- `aws_security_group`, `aws_network_acl`
+
+**Logging & Monitoring**
+- `aws_cloudtrail`, `aws_cloudwatch_log_group`, `aws_cloudwatch_metric_alarm`
+- `aws_s3_bucket_logging`, `aws_flow_log`
+- `aws_guardduty_detector`, `aws_config_configuration_recorder`
+
+**Encryption & Key Management**
+- `aws_kms_key`, `aws_kms_alias`
+- `aws_s3_bucket_server_side_encryption_configuration`
+
+**Backup & Recovery**
+- `aws_backup_vault`, `aws_backup_plan`
+- `aws_db_instance` (backup retention checks)
+
+**Load Balancing & Traffic**
+- `aws_lb_listener`, `aws_alb_listener`
+
+## OSCAL Output Structure
+
+Assessment results are returned in OSCAL 1.0.4 format:
+
+```json
+{
+  "assessment-results": {
+    "uuid": "550e8400-e29b-41d4-a716-446655440000",
+    "metadata": {
+      "title": "Nabla NIST 800-53 Assessment",
+      "version": "1.0.0",
+      "oscal-version": "1.0.4"
+    },
+    "results": [{
+      "title": "NIST 800-53 IaC Assessment",
+      "observations": [...],
+      "findings": [...],
+      "reviewed-controls": {
+        "control-selections": [{
+          "include-controls": [
+            { "control-id": "AC-2" },
+            { "control-id": "AC-3" }
+          ]
+        }]
+      }
+    }]
+  }
+}
+```
+
+## Example Assessment
+
+```bash
+    curl --request POST \
+        --url https://api.usenabla.com/v1/fedramp \
+        --header 'Content-Type: application/json' \
+        --header 'X-Customer-Key: <x-customer-key>' \
+        --data '{
+        "name": "<string>",
+        "format": "oscal",
+        "source_type": "terraform_state",
+        "source_content": "<string>",
+    }'
+```
+
+## Interpreting Results
+
+### Satisfied Controls
+Controls marked as **Satisfied** indicate that:
+- Required infrastructure resources are present
+- Security configurations meet baseline requirements
+- Evidence was successfully extracted from IaC
+
+### Not Satisfied Controls
+Controls marked as **NotSatisfied** may indicate:
+- Missing security controls (e.g., no CloudTrail logging)
+- Misconfigured resources (e.g., overly permissive IAM policies)
+- Weak cryptographic implementations
+
+### Findings
+Each finding includes:
+- **Control ID**: Which control failed
+- **Description**: What issue was detected
+- **Related Observations**: Links to specific evidence
+
+## Limitations
+
+<Warning>
+This automated assessment has important limitations:
+- **IaC-Only Analysis**: Only evaluates resources defined in Terraform/IaC
+- **Runtime Behavior**: Cannot assess operational security practices
+- **Organizational Controls**: Some controls (e.g., security training) require manual assessment
+- **AWS-Focused**: Currently optimized for AWS resources (expanding to multi-cloud)
+</Warning>
+
+## Best Practices
+
+1. **Combine with Manual Assessment**: Use automated results as a starting point, not a complete assessment
+2. **Review Findings**: Each finding should be investigated in context of your architecture
+3. **Track Over Time**: Run assessments regularly to monitor compliance posture
+4. **Supplement with Runtime Evidence**: Consider integrating runtime security scanning
+
+## Related Frameworks
+
+- [NIST 800-171](/api-reference/schemas/800-171) - Protecting Controlled Unclassified Information
+- [NIST 800-172](/api-reference/schemas/800-172) - Enhanced Security Requirements
+- [FIPS 140-3](/api-reference/schemas/fips-140-3) - Cryptographic Module Validation
+
+## References
+
+- [NIST SP 800-53 Rev 5 (Official)](https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final)
+- [OSCAL Specification](https://pages.nist.gov/OSCAL/)
+- [800-53 Control Catalog (JSON)](https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json)
