@@ -45,7 +45,7 @@
           {
             "group": "Control Mapping Schemas",
             "pages": [
-              "api-reference/schemas/500-53",
+              "api-reference/schemas/800-53",
               "api-reference/schemas/800-171",
               "api-reference/schemas/800-172",
               "api-reference/schemas/fips-140-3"
