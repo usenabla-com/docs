@@ -1,0 +1,132 @@
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#1a1a2e','primaryTextColor':'#fff','primaryBorderColor':'#16213e','lineColor':'#0f3460','secondaryColor':'#e94560','tertiaryColor':'#0f3460','fontSize':'14px','fontFamily':'Inter, system-ui, sans-serif'}}}%%
+
+flowchart LR
+    %% Client Layer
+    Client["<img src='https://cdn-icons-png.flaticon.com/512/1005/1005141.png' width='30'/><br/><b>API Client</b><br/><i>External System</i>"]
+
+    %% API Gateway
+    API["<b>Axum API Gateway</b><br/>:8080<br/>CORS • Auth • Routing"]
+
+    %% Authentication
+    Auth["<b>Authentication Layer</b><br/>X-Customer-Key Header<br/>CustomerService"]
+
+    %% PostgreSQL for App State
+    PG[("PostgreSQL<br/><b>App Database</b><br/>Customer Accounts<br/>API Keys")]
+
+    %% Endpoints
+    subgraph Endpoints["<b>REST Endpoints</b>"]
+        direction TB
+        E1["/v1/fips<br/><i>FIPS 140-2/3 Analysis</i>"]
+        E2["/v1/evidence/terraform<br/><i>Terraform State</i>"]
+        E3["/v1/evidence/azure<br/><i>Azure Resources</i>"]
+        E4["/v1/evidence/firmware<br/><i>Firmware Binary</i>"]
+    end
+
+    %% Evidence Sources
+    subgraph Sources["<b>Evidence Sources</b>"]
+        direction TB
+        S1["TerraformSource<br/>State File Parser"]
+        S2["AzureSource<br/>Graph API + WIF"]
+        S3["FirmwareSource<br/>Binary Analysis"]
+        S4["FIPS ZIP Source<br/>Multi-Evidence"]
+    end
+
+    %% Source Adapters
+    subgraph Adapters["<b>Source Adapters</b>"]
+        direction TB
+        A1["TerraformAdapter<br/>Resource Mapping"]
+        A2["AzureAdapter<br/>Resource Mapping"]
+        A3["FirmwareAdapter<br/>Binary Features"]
+    end
+
+    %% Evidence Lake (DuckDB)
+    DuckDB{{"<img src='https://duckdb.org/images/logo-dl/DuckDB_Logo.png' width='50'/><br/><b>EvidenceLake</b><br/><i>DuckDB In-Memory</i><br/>SQL Normalized Schema"}}
+
+    %% Lake Schema
+    subgraph LakeSchema["<b>Lake Tables</b>"]
+        direction TB
+        T1["system_metadata<br/><i>OS, FIPS Mode, Crypto</i>"]
+        T2["asset_inventory<br/><i>Compute, Storage, Network</i>"]
+        T3["sboms<br/><i>Components, Libraries</i>"]
+        T4["configs_posture<br/><i>Policies, Crypto Config</i>"]
+    end
+
+    %% Compliance Assessors
+    subgraph Assessors["<b>Compliance Assessors</b>"]
+        direction TB
+        CA1["NIST 800-53<br/>Security Controls"]
+        CA2["NIST 800-171<br/>CUI Protection"]
+        CA3["NIST 800-172<br/>Enhanced CUI"]
+        CA4["NIST 800-193<br/>PFR Firmware"]
+        CA5["FIPS 140-2/3<br/>Cryptographic"]
+        CA6["NIST CSF 2.0<br/>Cybersecurity Framework"]
+    end
+
+    %% Output Formats
+    subgraph Outputs["<b>Output Formats</b>"]
+        direction TB
+        O1["OSCAL JSON<br/><i>FedRAMP/GRC Tools</i>"]
+        O2["JSON Assessment<br/><i>Native Format</i>"]
+        O3["YAML Assessment<br/><i>Human Readable</i>"]
+        O4["Mermaid Diagrams<br/><i>CFG/Architecture</i>"]
+    end
+
+    %% Response
+    Response["<b>Evidence Response</b><br/>Assessment + Artifacts<br/>Base64 Encoded"]
+
+    %% Flow connections
+    Client -->|"HTTPS POST<br/>Base64 Payload"| API
+    API --> Auth
+    Auth -->|"Validate Key"| PG
+    Auth --> Endpoints
+
+    E1 --> S4
+    E2 --> S1
+    E3 --> S2
+    E4 --> S3
+
+    S1 --> A1
+    S2 --> A2
+    S3 --> A3
+    S4 --> A1
+
+    A1 -->|"Normalize to Schema"| DuckDB
+    A2 -->|"Normalize to Schema"| DuckDB
+    A3 -->|"Normalize to Schema"| DuckDB
+
+    DuckDB --> LakeSchema
+
+    LakeSchema -->|"SQL Queries"| Assessors
+
+    Assessors -->|"Control Mapping"| Outputs
+
+    Outputs --> Response
+    Response -->|"JSON Response"| Client
+
+    %% Styling
+    classDef clientStyle fill:#e94560,stroke:#c62f47,stroke-width:3px,color:#fff
+    classDef apiStyle fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#fff
+    classDef authStyle fill:#533483,stroke:#3d1f66,stroke-width:2px,color:#fff
+    classDef dbStyle fill:#336791,stroke:#214969,stroke-width:2px,color:#fff
+    classDef endpointStyle fill:#0f3460,stroke:#0a2342,stroke-width:2px,color:#fff
+    classDef sourceStyle fill:#2a9d8f,stroke:#1d7166,stroke-width:2px,color:#fff
+    classDef adapterStyle fill:#e76f51,stroke:#c55840,stroke-width:2px,color:#fff
+    classDef duckdbStyle fill:#ffa500,stroke:#cc8400,stroke-width:4px,color:#1a1a2e
+    classDef schemaStyle fill:#ffcc80,stroke:#ffa726,stroke-width:2px,color:#1a1a2e
+    classDef assessorStyle fill:#4a90e2,stroke:#2e5c91,stroke-width:2px,color:#fff
+    classDef outputStyle fill:#7b68ee,stroke:#5a4bb5,stroke-width:2px,color:#fff
+    classDef responseStyle fill:#32cd32,stroke:#228b22,stroke-width:3px,color:#fff
+
+    class Client clientStyle
+    class API apiStyle
+    class Auth authStyle
+    class PG dbStyle
+    class E1,E2,E3,E4 endpointStyle
+    class S1,S2,S3,S4 sourceStyle
+    class A1,A2,A3 adapterStyle
+    class DuckDB duckdbStyle
+    class T1,T2,T3,T4 schemaStyle
+    class CA1,CA2,CA3,CA4,CA5,CA6 assessorStyle
+    class O1,O2,O3,O4 outputStyle
+    class Response responseStyle
+

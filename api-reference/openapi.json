@@ -184,7 +184,7 @@
         "tags": ["Firmware"],
         "summary": "Analyze firmware binary for security",
         "operationId": "analyzeFirmwareBinary",
-        "description": "Perform security analysis on firmware/binary files. Detects format (ELF, PE, Mach-O, WebAssembly), identifies security features (NX, ASLR, stack canaries, CFI), extracts strings, generates control flow graphs, and maps findings to NIST 800-53 and NIST SP 800-193 (Platform Firmware Resilience).",
+        "description": "Perform security analysis on firmware/binary files. Detects format, identifies security features (NX, ASLR, stack canaries, CFI), extracts strings, generates control flow graphs, and maps findings to NIST SP 800-193.",
         "security": [{"CustomerKey": []}],
         "requestBody": {
           "required": true,
