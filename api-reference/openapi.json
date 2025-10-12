@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Nabla Evidence Engine API",
-    "version": "0.2.0",
-    "description": "GRC evidence orchestration and delivery API. Manage evidence source connections, package evidence, and deliver to compliance and security platforms.",
+    "version": "1.0.0",
+    "description": "Compliance evidence orchestration and security analysis API. Analyze firmware binaries, infrastructure-as-code, and cloud configurations for FedRAMP, CMMC, FIPS, and other compliance frameworks.",
     "contact": {
       "name": "Nabla",
       "url": "https://www.usenabla.com"
@@ -12,69 +12,72 @@
   "servers": [
     {
       "url": "https://api.usenabla.com",
-      "description": "Primary"
+      "description": "Production"
+    },
+    {
+      "url": "https://api.gov.usenabla.com",
+      "description": "GovCloud"
+    },
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Development"
     }
   ],
   "tags": [
     {
-      "name": "Evidence"
+      "name": "Evidence",
+      "description": "Compliance evidence generation and analysis"
+    },
+    {
+      "name": "Firmware",
+      "description": "Binary firmware security analysis"
+    },
+    {
+      "name": "FIPS",
+      "description": "FIPS 140-2/140-3 cryptographic compliance"
     }
   ],
-  "security": [],
+  "security": [
+    {
+      "CustomerKey": []
+    }
+  ],
   "paths": {
-    "/v1/fedramp": {
+    "/v1/evidence/terraform": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "Assesss FedRamp",
-        "description": "Generate FedRAMP compliance evidence (NIST 800-53) from a repository in specified format",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Customer-Key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Customer API key for authentication"
-          }
-        ],
+        "summary": "Analyze Terraform state for compliance",
+        "operationId": "assessTerraformState",
+        "description": "Generate NIST 800-53 compliance assessment from Terraform state file with optional architecture diagram",
+        "security": [{"CustomerKey": []}],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name", "format", "source_type"],
+                "required": ["name", "format", "content_base64"],
                 "properties": {
                   "name": {
                     "type": "string",
-                    "description": "Name for the evidence generation request"
+                    "description": "Name for the evidence assessment",
+                    "example": "production-infrastructure"
                   },
                   "format": {
                     "type": "string",
                     "enum": ["oscal", "yaml", "json"],
-                    "description": "Output format for the evidence"
+                    "description": "Output format for the assessment",
+                    "example": "json"
                   },
-                  "source_type": {
+                  "content_base64": {
                     "type": "string",
-                    "enum": ["terraform_state"],
-                    "description": "Type of evidence source to parse"
+                    "description": "Base64-encoded Terraform state file (JSON)",
+                    "example": "eyJ2ZXJzaW9uIjo0LCJ0ZXJyYWZvcm1fdmVyc2lvbiI6IjEuMC4wIiwicmVzb3VyY2VzIjpbXX0="
                   },
-                  "source_path": {
-                    "type": "string",
-                    "description": "Path to evidence source (local file path or remote URL). Either source_path or source_content is required."
-                  },
-                  "source_content": {
-                    "type": "string",
-                    "description": "Base64-encoded evidence source content. Either source_path or source_content is required."
-                  },
-                  "source_credentials": {
-                    "type": "string",
-                    "description": "JSON object containing source-specific credentials for authentication"
-                  },
-                  "repo": {
-                    "type": "string",
-                    "description": "Optional repository URL or identifier for Terraform configurations without remote state"
+                  "include_diagram": {
+                    "type": "boolean",
+                    "description": "Include Mermaid architecture diagram in artifacts",
+                    "default": false
                   }
                 }
               }
@@ -83,120 +86,7 @@
         },
         "responses": {
           "200": {
-            "description": "FedRAMP evidence generation completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["queued", "running", "completed", "failed"]
-                    },
-                    "created_at": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "assessment": {
-                      "type": "object",
-                      "description": "Compliance assessment results",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "framework": {
-                          "type": "string",
-                          "description": "Compliance framework name (e.g., NIST 800-53, CMMC, FIPS)"
-                        },
-                        "version": {
-                          "type": "string",
-                          "description": "Framework version"
-                        },
-                        "timestamp": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "controls": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "control_id": {
-                                "type": "string"
-                              },
-                              "title": {
-                                "type": "string"
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": ["satisfied", "not-satisfied", "not-applicable"]
-                              },
-                              "findings": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              },
-                              "evidence": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              }
-                            },
-                            "required": ["control_id", "title", "status", "findings", "evidence"]
-                          }
-                        },
-                        "summary": {
-                          "type": "object",
-                          "properties": {
-                            "total_controls": {
-                              "type": "integer"
-                            },
-                            "satisfied": {
-                              "type": "integer"
-                            },
-                            "not_satisfied": {
-                              "type": "integer"
-                            },
-                            "not_applicable": {
-                              "type": "integer"
-                            }
-                          },
-                          "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"]
-                        }
-                      },
-                      "required": ["id", "framework", "version", "timestamp", "controls", "summary"]
-                    },
-                    "artifacts": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "filename": {
-                            "type": "string"
-                          },
-                          "content_type": {
-                            "type": "string"
-                          },
-                          "content_base64": {
-                            "type": "string"
-                          },
-                          "size_bytes": {
-                            "type": "integer"
-                          }
-                        },
-                        "required": ["filename", "content_type", "content_base64", "size_bytes"]
-                      }
-                    }
-                  },
-                  "required": ["id", "status", "created_at", "assessment", "artifacts"]
-                }
-              }
-            }
+            "$ref": "#/components/responses/EvidenceResponse"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -210,59 +100,60 @@
         }
       }
     },
-    "/v1/cmmc": {
+    "/v1/evidence/azure": {
       "post": {
         "tags": ["Evidence"],
-        "summary": "Assesss CMMC",
-        "description": "Generate CMMC 2.0 compliance evidence (NIST 800-171 + 800-172) from a repository in specified format",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Customer-Key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Customer API key for authentication"
-          }
-        ],
+        "summary": "Analyze Azure environment for compliance (live)",
+        "operationId": "assessAzureEnvironment",
+        "description": "Generate NIST 800-53 compliance assessment from live Azure environment using Workload Identity Federation. Requires Fabric plan.",
+        "security": [{"CustomerKey": []}],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name", "format", "source_type"],
+                "required": ["name", "format", "azure_wif"],
                 "properties": {
                   "name": {
                     "type": "string",
-                    "description": "Name for the evidence generation request"
+                    "description": "Name for the evidence assessment",
+                    "example": "azure-production"
                   },
                   "format": {
                     "type": "string",
                     "enum": ["oscal", "yaml", "json"],
-                    "description": "Output format for the evidence"
+                    "description": "Output format for the assessment",
+                    "example": "json"
                   },
-                  "source_type": {
-                    "type": "string",
-                    "enum": ["terraform_state"],
-                    "description": "Type of evidence source to parse"
-                  },
-                  "source_path": {
-                    "type": "string",
-                    "description": "Path to evidence source (local file path or remote URL). Either source_path or source_content is required."
-                  },
-                  "source_content": {
-                    "type": "string",
-                    "description": "Base64-encoded evidence source content. Either source_path or source_content is required."
-                  },
-                  "source_credentials": {
-                    "type": "string",
-                    "description": "JSON object containing source-specific credentials for authentication"
-                  },
-                  "repo": {
-                    "type": "string",
-                    "description": "Optional repository URL or identifier for Terraform configurations without remote state"
+                  "azure_wif": {
+                    "type": "object",
+                    "description": "Azure Workload Identity Federation configuration",
+                    "required": ["tenant_id", "client_id", "oidc_token", "subscription_ids"],
+                    "properties": {
+                      "tenant_id": {
+                        "type": "string",
+                        "description": "Azure AD tenant ID",
+                        "example": "00000000-0000-0000-0000-000000000000"
+                      },
+                      "client_id": {
+                        "type": "string",
+                        "description": "Azure AD application (client) ID",
+                        "example": "00000000-0000-0000-0000-000000000000"
+                      },
+                      "oidc_token": {
+                        "type": "string",
+                        "description": "OIDC JWT token from identity provider (e.g., GitHub Actions)"
+                      },
+                      "subscription_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "List of Azure subscription IDs to analyze",
+                        "example": ["00000000-0000-0000-0000-000000000000"]
+                      }
+                    }
                   }
                 }
               }
@@ -271,117 +162,81 @@
         },
         "responses": {
           "200": {
-            "description": "CMMC evidence generation completed",
+            "$ref": "#/components/responses/EvidenceResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/evidence/firmware": {
+      "post": {
+        "tags": ["Firmware"],
+        "summary": "Analyze firmware binary for security",
+        "operationId": "analyzeFirmwareBinary",
+        "description": "Perform security analysis on firmware/binary files. Detects format (ELF, PE, Mach-O, WebAssembly), identifies security features (NX, ASLR, stack canaries, CFI), extracts strings, generates control flow graphs, and maps findings to NIST 800-53 and NIST SP 800-193 (Platform Firmware Resilience).",
+        "security": [{"CustomerKey": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "content_base64"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name for the firmware analysis",
+                    "example": "iot-device-firmware"
+                  },
+                  "file_name": {
+                    "type": "string",
+                    "description": "Original filename (optional)",
+                    "example": "firmware-v2.6.11.bin"
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "description": "Base64-encoded firmware binary",
+                    "example": "f0VMRgIBAQAAAAAAAAAAAA=="
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name for the firmware analysis"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Firmware binary file"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Firmware analysis completed",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["queued", "running", "completed", "failed"]
-                    },
-                    "created_at": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "assessment": {
-                      "type": "object",
-                      "description": "Compliance assessment results",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "framework": {
-                          "type": "string",
-                          "description": "Compliance framework name (e.g., NIST 800-53, CMMC, FIPS)"
-                        },
-                        "version": {
-                          "type": "string",
-                          "description": "Framework version"
-                        },
-                        "timestamp": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "controls": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "control_id": {
-                                "type": "string"
-                              },
-                              "title": {
-                                "type": "string"
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": ["satisfied", "not-satisfied", "not-applicable"]
-                              },
-                              "findings": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              },
-                              "evidence": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              }
-                            },
-                            "required": ["control_id", "title", "status", "findings", "evidence"]
-                          }
-                        },
-                        "summary": {
-                          "type": "object",
-                          "properties": {
-                            "total_controls": {
-                              "type": "integer"
-                            },
-                            "satisfied": {
-                              "type": "integer"
-                            },
-                            "not_satisfied": {
-                              "type": "integer"
-                            },
-                            "not_applicable": {
-                              "type": "integer"
-                            }
-                          },
-                          "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"]
-                        }
-                      },
-                      "required": ["id", "framework", "version", "timestamp", "controls", "summary"]
-                    },
-                    "artifacts": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "filename": {
-                            "type": "string"
-                          },
-                          "content_type": {
-                            "type": "string"
-                          },
-                          "content_base64": {
-                            "type": "string"
-                          },
-                          "size_bytes": {
-                            "type": "integer"
-                          }
-                        },
-                        "required": ["filename", "content_type", "content_base64", "size_bytes"]
-                      }
-                    }
-                  },
-                  "required": ["id", "status", "created_at", "assessment", "artifacts"]
+                  "$ref": "#/components/schemas/FirmwareResponse"
                 }
               }
             }
@@ -391,29 +246,17 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
-          },
-          "422": {
-            "$ref": "#/components/responses/Unprocessable"
           }
         }
       }
     },
     "/v1/fips": {
       "post": {
-        "tags": ["Evidence"],
-        "summary": "Assesss FIPS",
-        "description": "Upload a ZIP archive containing multiple evidence sources and generate FIPS 140-2/140-3 cryptographic compliance assessment",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Customer-Key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Customer API key for authentication"
-          }
-        ],
+        "tags": ["FIPS"],
+        "summary": "Generate FIPS cryptographic assessment from ZIP bundle",
+        "operationId": "generateFipsAssessment",
+        "description": "Upload a ZIP archive containing multiple evidence sources (SBOMs, Terraform state, Kubernetes manifests, Ansible playbooks, package locks, system info) and generate FIPS 140-2/140-3 cryptographic compliance assessment. Detects cryptographic libraries, validates FIPS compliance, and checks for weak algorithms.",
+        "security": [{"CustomerKey": []}],
         "requestBody": {
           "required": true,
           "content": {
@@ -424,16 +267,19 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "description": "Name for the FIPS assessment request"
+                    "description": "Name for the FIPS assessment",
+                    "example": "production-crypto-audit"
                   },
                   "format": {
                     "type": "string",
                     "enum": ["oscal", "yaml", "json"],
-                    "description": "Output format for the evidence"
+                    "description": "Output format for the assessment",
+                    "example": "json"
                   },
                   "zip_content": {
                     "type": "string",
-                    "description": "Base64-encoded ZIP archive containing evidence files. Supported evidence types: SBOM (sbom, cyclonedx, spdx), Terraform state files (terraform, tfstate), Kubernetes manifests (kubernetes, k8s), Ansible playbooks (ansible), package lock files (package_lock, npm, poetry, cargo, go_mod), system info (system_info, openssl, crypto_policy)"
+                    "description": "Base64-encoded ZIP archive. Supported file types: sbom.json/spdx.json (SBOM), *.tfstate (Terraform), *.yaml/manifest.yaml (Kubernetes), playbook.yaml (Ansible), package-lock.json/Cargo.lock/go.mod/poetry.lock (package managers), system_info.json/openssl.json (system crypto info)",
+                    "example": "UEsDBBQAAAAIAA=="
                   }
                 }
               }
@@ -442,217 +288,7 @@
         },
         "responses": {
           "200": {
-            "description": "FIPS evidence assessment completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["queued", "running", "completed", "failed"]
-                    },
-                    "created_at": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "assessment": {
-                      "type": "object",
-                      "description": "Compliance assessment results",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "framework": {
-                          "type": "string",
-                          "description": "Compliance framework name (e.g., NIST 800-53, CMMC, FIPS)"
-                        },
-                        "version": {
-                          "type": "string",
-                          "description": "Framework version"
-                        },
-                        "timestamp": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "controls": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "control_id": {
-                                "type": "string"
-                              },
-                              "title": {
-                                "type": "string"
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": ["satisfied", "not-satisfied", "not-applicable"]
-                              },
-                              "findings": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              },
-                              "evidence": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              }
-                            },
-                            "required": ["control_id", "title", "status", "findings", "evidence"]
-                          }
-                        },
-                        "summary": {
-                          "type": "object",
-                          "properties": {
-                            "total_controls": {
-                              "type": "integer"
-                            },
-                            "satisfied": {
-                              "type": "integer"
-                            },
-                            "not_satisfied": {
-                              "type": "integer"
-                            },
-                            "not_applicable": {
-                              "type": "integer"
-                            }
-                          },
-                          "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"]
-                        }
-                      },
-                      "required": ["id", "framework", "version", "timestamp", "controls", "summary"]
-                    },
-                    "artifacts": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "filename": {
-                            "type": "string"
-                          },
-                          "content_type": {
-                            "type": "string"
-                          },
-                          "content_base64": {
-                            "type": "string"
-                          },
-                          "size_bytes": {
-                            "type": "integer"
-                          }
-                        },
-                        "required": ["filename", "content_type", "content_base64", "size_bytes"]
-                      }
-                    }
-                  },
-                  "required": ["id", "status", "created_at", "assessment", "artifacts"]
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "422": {
-            "$ref": "#/components/responses/Unprocessable"
-          }
-        }
-      }
-    },
-    "/v1/diagram": {
-      "post": {
-        "tags": ["Evidence"],
-        "summary": "Generate architecture diagram",
-        "description": "Generate Mermaid architecture diagram from Terraform statefile using AI",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Customer-Key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Customer API key for authentication"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["name"],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Name for the diagram generation request"
-                  },
-                  "statefile_path": {
-                    "type": "string",
-                    "description": "Path to Terraform statefile (local file path or remote URL). Either statefile_path or statefile_content is required."
-                  },
-                  "statefile_content": {
-                    "type": "string",
-                    "description": "Base64-encoded Terraform statefile content. Either statefile_path or statefile_content is required."
-                  },
-                  "model": {
-                    "type": "string",
-                    "description": "Optional LLM model to use (e.g., \"@cf/openai/gpt-oss-120b\")"
-                  },
-                  "api_key": {
-                    "type": "string",
-                    "description": "Optional API key for AI service"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Diagram generated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "mermaid_content": {
-                      "type": "string"
-                    },
-                    "metadata": {
-                      "type": "object",
-                      "properties": {
-                        "generated_at": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "node_count": {
-                          "type": "integer"
-                        },
-                        "edge_count": {
-                          "type": "integer"
-                        },
-                        "title": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["generated_at", "node_count", "edge_count", "title"]
-                    }
-                  },
-                  "required": ["mermaid_content", "metadata"]
-                }
-              }
-            }
+            "$ref": "#/components/responses/EvidenceResponse"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -668,9 +304,292 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "CustomerKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Customer-Key",
+        "description": "Customer API key for authentication"
+      }
+    },
+    "schemas": {
+      "EvidenceResponse": {
+        "type": "object",
+        "required": ["id", "status", "created_at", "assessment", "artifacts"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for this assessment"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["completed", "failed"],
+            "description": "Assessment status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when assessment was created"
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/ComplianceAssessment"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            },
+            "description": "Generated artifacts (assessment files, diagrams)"
+          }
+        }
+      },
+      "ComplianceAssessment": {
+        "type": "object",
+        "required": ["id", "framework", "version", "timestamp", "controls", "summary"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "framework": {
+            "type": "string",
+            "description": "Compliance framework name",
+            "enum": ["NIST 800-53", "NIST 800-171", "NIST 800-172", "CMMC", "FIPS 140-2", "FIPS 140-3", "NIST SP 800-193"],
+            "example": "NIST 800-53"
+          },
+          "version": {
+            "type": "string",
+            "description": "Framework version",
+            "example": "Rev. 5"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ControlAssessment"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/AssessmentSummary"
+          }
+        }
+      },
+      "ControlAssessment": {
+        "type": "object",
+        "required": ["control_id", "title", "status", "findings", "evidence"],
+        "properties": {
+          "control_id": {
+            "type": "string",
+            "description": "Control identifier",
+            "example": "SC-13"
+          },
+          "title": {
+            "type": "string",
+            "description": "Control title",
+            "example": "Cryptographic Protection"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["satisfied", "not-satisfied", "not-applicable"],
+            "description": "Control satisfaction status"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of findings or issues"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Evidence supporting the assessment"
+          }
+        }
+      },
+      "AssessmentSummary": {
+        "type": "object",
+        "required": ["total_controls", "satisfied", "not_satisfied", "not_applicable"],
+        "properties": {
+          "total_controls": {
+            "type": "integer",
+            "description": "Total number of controls assessed"
+          },
+          "satisfied": {
+            "type": "integer",
+            "description": "Number of satisfied controls"
+          },
+          "not_satisfied": {
+            "type": "integer",
+            "description": "Number of not-satisfied controls"
+          },
+          "not_applicable": {
+            "type": "integer",
+            "description": "Number of not-applicable controls"
+          }
+        }
+      },
+      "Artifact": {
+        "type": "object",
+        "required": ["filename", "content_type", "content_base64", "size_bytes"],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Artifact filename",
+            "example": "nist80053-assessment.json"
+          },
+          "content_type": {
+            "type": "string",
+            "description": "MIME type",
+            "example": "application/json"
+          },
+          "content_base64": {
+            "type": "string",
+            "description": "Base64-encoded artifact content"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "description": "Size in bytes"
+          },
+          "diagram": {
+            "type": "string",
+            "description": "Mermaid diagram content (if applicable)"
+          }
+        }
+      },
+      "FirmwareResponse": {
+        "type": "object",
+        "required": ["id", "name", "detected_format", "strings", "security_features", "findings"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Firmware name"
+          },
+          "detected_format": {
+            "type": "string",
+            "enum": ["elf", "pe", "mach_o", "wasm", "raw"],
+            "description": "Detected binary format"
+          },
+          "architecture": {
+            "type": "string",
+            "description": "CPU architecture",
+            "example": "x86_64"
+          },
+          "entry_point": {
+            "type": "string",
+            "description": "Entry point address",
+            "example": "0x401000"
+          },
+          "strings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extracted ASCII strings (max 200)"
+          },
+          "security_features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["nx", "aslr", "stack_canary", "cfi", "fortify", "pie", "relro", "signed"]
+            },
+            "description": "Detected security features"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Security findings with severity (CRITICAL, HIGH, MED, LOW, INFO)",
+            "example": ["MED: NX/DEP bit not enabled", "LOW: Stack canaries not detected"]
+          },
+          "cfg_mermaid": {
+            "type": "string",
+            "description": "Control Flow Graph in Mermaid format (if available)"
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MappingHit"
+            },
+            "description": "Mappings to compliance frameworks"
+          },
+          "pfr_assessment": {
+            "type": "object",
+            "description": "NIST SP 800-193 Platform Firmware Resilience assessment"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            }
+          }
+        }
+      },
+      "MappingHit": {
+        "type": "object",
+        "required": ["framework", "control", "rationale"],
+        "properties": {
+          "framework": {
+            "type": "string",
+            "example": "nist_800_53"
+          },
+          "control": {
+            "type": "string",
+            "example": "SI-16"
+          },
+          "rationale": {
+            "type": "string",
+            "example": "Binary hardening feature 'nx' contributes to memory protection"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error", "message"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "HTTP status code"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Request identifier for debugging"
+          }
+        }
+      }
+    },
     "responses": {
+      "EvidenceResponse": {
+        "description": "Evidence assessment completed successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/EvidenceResponse"
+            }
+          }
+        }
+      },
       "BadRequest": {
-        "description": "Bad request",
+        "description": "Bad request - invalid input",
         "content": {
           "application/json": {
             "schema": {
@@ -680,7 +599,17 @@
         }
       },
       "Unauthorized": {
-        "description": "Not authenticated",
+        "description": "Unauthorized - invalid or missing API key",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Forbidden - insufficient plan or permissions",
         "content": {
           "application/json": {
             "schema": {
@@ -690,7 +619,7 @@
         }
       },
       "Unprocessable": {
-        "description": "Unprocessable entity",
+        "description": "Unprocessable entity - unable to parse evidence",
         "content": {
           "application/json": {
             "schema": {
@@ -698,27 +627,6 @@
             }
           }
         }
-      }
-    },
-    "schemas": {
-      "Error": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "error": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "requestId": {
-            "type": "string"
-          }
-        },
-        "required": ["error", "message"]
       }
     }
   }
